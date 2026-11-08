@@ -1,5 +1,6 @@
 package dev.jyotiraditya.dmt.presentation.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import dev.jyotiraditya.dmt.ui.components.TextLink
 import dev.jyotiraditya.dmt.ui.components.TrackRow
 import dev.jyotiraditya.dmt.ui.components.animateFieldAsState
 import dev.jyotiraditya.dmt.ui.components.background
+import dev.jyotiraditya.dmt.ui.components.bottomSeparator
 import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.components.rememberFieldColor
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
@@ -53,19 +55,19 @@ import dev.jyotiraditya.dmt.ui.theme.inkOn
 import dev.jyotiraditya.dmt.ui.theme.poster
 import dev.jyotiraditya.dmt.util.asTime
 
-/** The header of an album, artist or playlist, tinted with its cover colour. */
+/** The header of an album, artist, playlist or folder, tinted with its cover colour or [tint]. */
 @Composable
 internal fun DetailHead(
     title: String,
     meta: String,
     tracks: List<Track>,
-    dispatch: (DmtAction) -> Unit,
     modifier: Modifier = Modifier,
     coverKey: Any? = null,
-    action: (@Composable (Color) -> Unit)? = null,
+    tint: Color? = null,
 ) {
     val seed = tracks.firstOrNull()
-    val field = rememberFieldColor(seed)
+    val ownField = rememberFieldColor(seed)
+    val field = tint ?: ownField
     val paint by animateFieldAsState(field)
     val ink = field.inkOn()
 
@@ -110,35 +112,58 @@ internal fun DetailHead(
             color = ink,
             modifier = Modifier.padding(top = 2.dp),
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            modifier = Modifier.padding(top = 20.dp),
-        ) {
-            if (tracks.isNotEmpty()) {
-                Block(
-                    label = stringResource(R.string.action_play),
-                    icon = DmtIcons.Play,
-                    fill = ink,
-                    ink = field,
-                    onClick = { dispatch(DmtAction.PlayAt(tracks, 0)) },
-                )
-                TextLink(
-                    label = stringResource(R.string.player_shuffle),
-                    color = ink,
-                    onClick = { dispatch(DmtAction.ShufflePlay(tracks)) },
-                )
-                TextLink(
-                    label = stringResource(R.string.action_queue),
-                    color = ink,
-                    onClick = { dispatch(DmtAction.Enqueue(tracks, title)) },
-                )
-            }
-            action?.invoke(ink)
-        }
     }
 }
 
+/** The play, shuffle, queue and optional extra action row, pinned while the page scrolls. */
+@Composable
+internal fun DetailActions(
+    title: String,
+    tracks: List<Track>,
+    dispatch: (DmtAction) -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color? = null,
+    action: (@Composable (Color) -> Unit)? = null,
+) {
+    val seed = tracks.firstOrNull()
+    val ownField = rememberFieldColor(seed)
+    val field = tint ?: ownField
+    val paint by animateFieldAsState(field)
+    val ink = field.inkOn()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background { paint }
+                .bottomSeparator()
+                .padding(horizontal = Margin, vertical = 8.dp),
+    ) {
+        if (tracks.isNotEmpty()) {
+            Block(
+                label = stringResource(R.string.action_play),
+                icon = DmtIcons.Play,
+                fill = ink,
+                ink = field,
+                onClick = { dispatch(DmtAction.PlayAt(tracks, 0)) },
+            )
+            TextLink(
+                label = stringResource(R.string.player_shuffle),
+                color = ink,
+                onClick = { dispatch(DmtAction.ShufflePlay(tracks)) },
+            )
+            TextLink(
+                label = stringResource(R.string.action_queue),
+                color = ink,
+                onClick = { dispatch(DmtAction.Enqueue(tracks, title)) },
+            )
+        }
+        action?.invoke(ink)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun TracksDetail(
     title: String,
@@ -152,7 +177,8 @@ internal fun TracksDetail(
     val openTrackMenu = rememberTrackMenu(state, dispatch, libraryNavigation(dispatch))
     val playing = rememberWantsPlayback()
     LazyColumn(contentPadding = PaddingValues(bottom = LocalContentBottom.current)) {
-        item { DetailHead(title, meta, tracks, dispatch, coverKey = coverKey) }
+        item { DetailHead(title, meta, tracks, coverKey = coverKey) }
+        stickyHeader { DetailActions(title, tracks, dispatch) }
         item { Spacer(modifier = Modifier.height(12.dp)) }
         itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
             TrackRow(
@@ -178,11 +204,13 @@ internal fun TracksDetail(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ArtistDetail(artist: Artist, state: DmtState, dispatch: (DmtAction) -> Unit) {
     val albums = artist.discography
     LazyColumn(contentPadding = PaddingValues(bottom = LocalContentBottom.current)) {
-        item { DetailHead(artist.name, artistSummary(artist), artist.tracks, dispatch) }
+        item { DetailHead(artist.name, artistSummary(artist), artist.tracks) }
+        stickyHeader { DetailActions(artist.name, artist.tracks, dispatch) }
         items(albums, key = { it.id }) { a ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,

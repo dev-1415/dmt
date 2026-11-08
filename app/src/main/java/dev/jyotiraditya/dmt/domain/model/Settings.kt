@@ -38,6 +38,63 @@ enum class LibrarySort {
     }
 }
 
+/** The order folder tracks are listed in, before the ascending/descending choice. */
+enum class FolderSort {
+    TITLE,
+    ARTIST,
+    ALBUM,
+    TRACK_NUMBER,
+    DATE_ADDED,
+    DATE_MODIFIED,
+    DURATION,
+    FILE_NAME,
+    ;
+
+    /** The order this sort lists tracks in; names compare the way the device's language sorts. */
+    val comparator: Comparator<Track>
+        get() {
+            val names = Collator.getInstance().apply { strength = Collator.PRIMARY }
+            return when (this) {
+                TITLE -> compareBy(names) { it.title }
+
+                ARTIST -> compareBy<Track, String>(names) { it.artist }.thenBy(names) { it.title }
+
+                ALBUM ->
+                    compareBy<Track, String>(names) { it.album }
+                        .thenBy { it.discNumber }
+                        .thenBy { it.trackNumber }
+                        .thenBy(names) { it.title }
+
+                TRACK_NUMBER ->
+                    compareBy<Track> { it.discNumber }
+                        .thenBy { it.trackNumber }
+                        .thenBy(names) { it.title }
+
+                DATE_ADDED -> compareBy { it.dateAdded }
+
+                DATE_MODIFIED -> compareBy { it.dateModified }
+
+                DURATION -> compareBy { it.durationMs }
+
+                FILE_NAME -> compareBy<Track, String>(names) { it.path.substringAfterLast('/') }
+            }
+        }
+
+    /** These tracks in this order, reversed when [ascending] is false. */
+    fun sorted(tracks: List<Track>, ascending: Boolean): List<Track> =
+        tracks.sortedWith(if (ascending) comparator else comparator.reversed())
+}
+
+/** The sections of the library that can appear as top-level tabs. */
+enum class LibraryTab {
+    FOLDERS,
+    TRACKS,
+    ALBUMS,
+    ARTISTS,
+    PLAYLISTS,
+    GENRES,
+}
+
 /** The colour of buttons, toggles and the now-playing marks. */
 enum class AccentColor {
     GREEN,
@@ -69,6 +126,12 @@ data class DmtSettings(
     val setupDone: Boolean = false,
     val hiddenFolders: Set<String> = emptySet(),
     val librarySort: LibrarySort = LibrarySort.TITLE,
+    val folderSort: FolderSort = FolderSort.TITLE,
+    val folderSortAscending: Boolean = true,
+    /** The folder the Folders tab opens at, or null for the library root. */
+    val startFolder: String? = null,
+    /** The library sections shown as top-level tabs. */
+    val visibleLibraryTabs: Set<LibraryTab> = LibraryTab.entries.toSet(),
     /** The servers added as sources, in the order they were added. */
     val sources: List<ServerSource> = emptyList(),
     /** The [ServerSource.id] of the source in use, or null for this device. */

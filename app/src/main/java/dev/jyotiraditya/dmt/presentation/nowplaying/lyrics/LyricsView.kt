@@ -46,6 +46,7 @@ internal fun LyricsView(
     colors: LyricColors,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(top = 32.dp, bottom = 360.dp),
 ) {
     val listState = rememberLazyListState()
     val activeIndex by
@@ -78,7 +79,7 @@ internal fun LyricsView(
 
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(top = 32.dp, bottom = 360.dp),
+        contentPadding = contentPadding,
         modifier = modifier.fadingEdges(listState),
     ) {
         items(lyrics.lines) { line ->

@@ -2,10 +2,13 @@ package dev.jyotiraditya.dmt.presentation.nowplaying
 
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -13,9 +16,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.MaterialTheme
@@ -48,8 +53,8 @@ import dev.jyotiraditya.dmt.domain.model.asCredit
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.player.nowPlayingTrack
+import dev.jyotiraditya.dmt.presentation.nowplaying.lyrics.CurrentLyricLine
 import dev.jyotiraditya.dmt.ui.components.Artwork
-import dev.jyotiraditya.dmt.ui.components.Notice
 import dev.jyotiraditya.dmt.ui.components.QualityBadge
 import dev.jyotiraditya.dmt.ui.components.SeekBar
 import dev.jyotiraditya.dmt.ui.components.Tag
@@ -77,30 +82,50 @@ internal fun PlayingPage(
     steps: SeekSteps,
     field: Color,
     dispatch: (DmtAction) -> Unit,
-    showCover: Boolean,
-    coverHidden: Boolean,
-    onCoverPlaced: (LayoutCoordinates) -> Unit,
+    cover: (@Composable () -> Unit)?,
+    lyricsOpen: Boolean,
     onOpenArtist: () -> Unit,
-    onOpenQueue: () -> Unit,
+    onOpenAlbum: () -> Unit,
+    onOpenDetails: () -> Unit,
+    onToggleLyrics: () -> Unit,
 ) {
     val ink = field.inkOn()
     val dim = ink.secondary(field)
     PlayingLayout(
-        cover =
-            if (showCover) {
-                { PlayerCover(state, player, steps, coverHidden, onPlaced = onCoverPlaced) }
-            } else {
-                null
-            },
-        title = { TrackTitle(state, ink, dim, onOpenArtist) },
-        seek = { SeekRow(state, player, field, ink, dim) },
-        transport = { Transport(player, steps, field, ink) },
-        extras = {
+        cover = cover,
+        title = {
             Column {
-                Extras(state, player, field, ink, dispatch, onOpenQueue)
-                Notice(error = state.error, notice = state.notice)
+                PlayerActions(
+                    state = state,
+                    player = player,
+                    field = field,
+                    ink = ink,
+                    dispatch = dispatch,
+                    onOpenAlbum = onOpenAlbum,
+                    onOpenDetails = onOpenDetails,
+                    lyricsOpen = lyricsOpen,
+                    onToggleLyrics = onToggleLyrics,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                AnimatedVisibility(
+                    visible = !lyricsOpen && state.lyrics != null,
+                    enter = expandVertically(tween(240)) + fadeIn(tween(240)),
+                    exit = shrinkVertically(tween(240)) + fadeOut(tween(240)),
+                ) {
+                    CurrentLyricLine(
+                        state = state,
+                        player = player,
+                        background = field,
+                        onClick = onToggleLyrics,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    )
+                }
+                TrackTitle(state, ink, dim, onOpenArtist)
             }
         },
+        seek = { SeekRow(state, player, field, ink, dim) },
+        transport = { Transport(player, steps, field, ink) },
+        extras = { Spacer(modifier = Modifier.height(0.dp)) },
         maxCover = PlayerDimens.MaxCover,
         modifier = Modifier.fillMaxSize().padding(horizontal = Margin),
     )
@@ -126,13 +151,19 @@ internal fun PlayerCover(
             animationSpec = SurfaceSpring,
             label = "coverScale",
         )
+    val coverAlpha by
+        animateFloatAsState(
+            targetValue = if (hidden) 0f else 1f,
+            animationSpec = tween(240),
+            label = "coverAlpha",
+        )
     Box(contentAlignment = Alignment.Center, modifier = modifier) {
         Box(
             modifier =
                 Modifier.sizeIn(maxWidth = PlayerDimens.MaxCover, maxHeight = PlayerDimens.MaxCover)
                     .aspectRatio(1f)
                     .graphicsLayer {
-                        alpha = if (hidden) 0f else 1f
+                        alpha = coverAlpha
                         scaleX = scale
                         scaleY = scale
                         transformOrigin = TransformOrigin.Center
@@ -146,7 +177,7 @@ internal fun PlayerCover(
             state.animatedArtUrl?.let { url ->
                 AnimatedCover(
                     url = url,
-                    playing = rememberIsPlaying(player),
+                    playing = rememberIsPlaying(player) && !hidden,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

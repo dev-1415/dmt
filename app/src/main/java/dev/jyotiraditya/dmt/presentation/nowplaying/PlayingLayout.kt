@@ -42,7 +42,8 @@ internal fun PlayingLayout(
         val width = constraints.maxWidth
         val height = constraints.maxHeight
         val loose = Constraints(maxWidth = width)
-        val controls = measurables.takeLast(4).map { it.single().measure(loose) }
+        // A slot may emit no layout node, such as an empty extras strip.
+        val controls = measurables.takeLast(4).mapNotNull { it.firstOrNull()?.measure(loose) }
         val controlsHeight = controls.sumOf { it.height }
 
         val gaps =

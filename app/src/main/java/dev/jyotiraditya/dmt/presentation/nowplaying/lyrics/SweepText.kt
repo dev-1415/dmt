@@ -25,6 +25,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.style.ResolvedTextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import dev.jyotiraditya.lyrics.LyricWord
 
 /** Width of the soft edge at the sweep front, as a fraction of the font size. */
@@ -40,17 +41,21 @@ internal fun SweepText(
     sung: Color,
     unsung: Color,
     modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
 ) {
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val path =
-        remember(layout, words) {
-            layout?.let { SweepPath.of(text, words, LayoutGeometry(it)) } ?: SweepPath.Empty
-        }
+    var sweep by remember { mutableStateOf<Sweep?>(null) }
 
     BasicText(
         text = text,
         style = style.copy(color = unsung),
-        onTextLayout = { layout = it },
+        maxLines = maxLines,
+        overflow = overflow,
+        onTextLayout = { result ->
+            // Keep the path and the layout it was measured from together, so a relayout can never
+            // leave the path pointing at a line the new layout no longer has.
+            sweep = Sweep(result, SweepPath.of(text, words, LayoutGeometry(result)))
+        },
         modifier =
             modifier.drawWithCache {
                 val feather = style.fontSize.toPx() * FEATHER_EM
@@ -72,13 +77,14 @@ internal fun SweepText(
                 val layerPaint = Paint()
                 onDrawWithContent {
                     drawContent()
-                    val current = layout ?: return@onDrawWithContent
-                    val front = path.frontAt(position.value) ?: return@onDrawWithContent
+                    val current = sweep ?: return@onDrawWithContent
+                    val front = current.path.frontAt(position.value) ?: return@onDrawWithContent
                     val rtl =
-                        current.getParagraphDirection(current.getLineStart(front.line)) ==
-                            ResolvedTextDirection.Rtl
+                        current.layout.getParagraphDirection(
+                            current.layout.getLineStart(front.line),
+                        ) == ResolvedTextDirection.Rtl
                     drawSung(
-                        current,
+                        current.layout,
                         front,
                         sung,
                         if (rtl) fadeIn else fadeOut,
@@ -89,6 +95,9 @@ internal fun SweepText(
             },
     )
 }
+
+/** A text layout and the sweep path measured from that same layout. */
+private data class Sweep(val layout: TextLayoutResult, val path: SweepPath)
 
 /** Draws every line above the front whole, and the front line masked up to it. */
 private fun DrawScope.drawSung(

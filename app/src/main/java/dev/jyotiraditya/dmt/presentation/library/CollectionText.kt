@@ -49,6 +49,7 @@ fun folderTitle(folder: Folder): String =
 
 /** Where a folder sits and what it holds, such as `Music · 9 tracks · 54m`. */
 @Composable
-fun folderSummary(folder: Folder): String = listOf(folder.location, tracksSummary(folder.tracks))
-    .filter(String::isNotEmpty)
-    .joinToString(SEPARATOR)
+fun folderSummary(folder: Folder): String =
+    listOf(folder.location, tracksSummary(folder.allTracks))
+        .filter(String::isNotEmpty)
+        .joinToString(SEPARATOR)

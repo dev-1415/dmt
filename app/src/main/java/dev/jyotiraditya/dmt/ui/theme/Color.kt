@@ -1,6 +1,9 @@
 package dev.jyotiraditya.dmt.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.ColorUtils
 
 // A dark-only palette; surfaces are told apart by tone, never by borders or shadows.
 
@@ -29,6 +32,24 @@ val GreenInk = Color(0xFFFFFFFF)
 val Night = Color(0xFF000000)
 
 val NightInk = Color(0xFFF2F2F2)
+
+/** A dark neutral the cover tint is blended into, so no cover turns the UI olive or neon. */
+private val TintBase = Color(0xFF0E1114)
+
+/** This colour at a dark, muted tint that keeps light text readable. */
+fun Color.tintedDark(lightness: Float): Color {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[1] = (hsl[1] * 0.72f).coerceIn(0f, 1f)
+    hsl[2] = lightness
+    return lerp(TintBase, Color(ColorUtils.HSLToColor(hsl)), 0.78f)
+}
+
+/** The player background: a deep, rich tint of the cover colour. */
+fun Color.darkenedForPlayer(): Color = tintedDark(0.12f)
+
+/** The lighter top of the player gradient. */
+fun Color.darkenedForPlayerTop(): Color = tintedDark(0.20f)
 
 val Danger = Color(0xFFFF8A80)
 

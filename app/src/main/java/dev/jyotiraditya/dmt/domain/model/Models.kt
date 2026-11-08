@@ -57,7 +57,11 @@ data class Artist(val name: String, val albums: Int, val tracks: List<Track>) {
 @Immutable data class Genre(val name: String, val tracks: List<Track>)
 
 @Immutable
-data class Folder(val path: String, val tracks: List<Track>) {
+data class Folder(
+    val path: String,
+    val tracks: List<Track>,
+    val children: List<Folder> = emptyList(),
+) {
     /** The path below shared storage, such as `Music/Albums`, or empty for its root. */
     val relativePath: String = path.removePrefix(SHARED_STORAGE_ROOT).trim('/')
 
@@ -67,6 +71,9 @@ data class Folder(val path: String, val tracks: List<Track>) {
     /** The folders above this one, such as `Music`, or empty at the top. */
     val location: String
         get() = relativePath.substringBeforeLast('/', missingDelimiterValue = "")
+
+    /** Every track in this folder and below it. */
+    val allTracks: List<Track> by lazy { tracks + children.flatMap { it.allTracks } }
 }
 
 const val SHARED_STORAGE_ROOT = "/storage/emulated/0"
@@ -83,12 +90,25 @@ data class LibrarySnapshot(
     val artists: List<Artist> = emptyList(),
     val folders: List<Folder> = emptyList(),
     val genres: List<Genre> = emptyList(),
+    val folderRoots: List<Folder> = emptyList(),
 ) {
     private val byId by lazy { tracks.associateBy { it.id } }
     private val albumsById by lazy { albums.associateBy { it.id } }
+    private val albumByTrackId by lazy {
+        albums.flatMap { album -> album.tracks.map { it.id to album.id } }.toMap()
+    }
     private val artistsByKey by lazy { artists.associateBy { it.name.lowercase() } }
     private val foldersByPath by lazy { folders.associateBy { it.path } }
     private val genresByName by lazy { genres.associateBy { it.name } }
+    private val folderNodesByPath by lazy {
+        buildMap {
+            fun add(folder: Folder) {
+                put(folder.path, folder)
+                folder.children.forEach(::add)
+            }
+            folderRoots.forEach(::add)
+        }
+    }
     private val sorted = ConcurrentHashMap<LibrarySort, List<Track>>()
 
     /** The tracks in [sort] order, sorted once per order. */
@@ -104,12 +124,15 @@ data class LibrarySnapshot(
 
     fun artist(name: String): Artist? = artistsByKey[name.lowercase()]
 
-    fun folder(path: String): Folder? = foldersByPath[path]
+    fun folder(path: String): Folder? = folderNodesByPath[path] ?: foldersByPath[path]
+
+    /** The folder at [path] anywhere in the tree, including folders with no direct tracks. */
+    fun folderNode(path: String): Folder? = folderNodesByPath[path]
 
     fun genre(name: String): Genre? = genresByName[name]
 
     /** The album [track] is grouped under. */
-    fun albumOf(track: Track): Album? = album(track.albumKey)
+    fun albumOf(track: Track): Album? = albumByTrackId[track.id]?.let(::album)
 
     /** The artist [track] is grouped under. */
     fun artistOf(track: Track): Artist? = artist(track.primaryArtist)

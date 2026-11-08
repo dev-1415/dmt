@@ -1,8 +1,10 @@
 package dev.jyotiraditya.dmt.presentation.nowplaying.lyrics
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +36,7 @@ private val SECTION_GAP = 28.dp
 private val LINE_GAP = 8.dp
 private const val ARABIC_SCALE = 1.18f
 private const val RESTING_SCALE = 0.96f
+private const val LYRIC_COLOR_MS = 180
 
 /** One line of lyrics: its main text, then any backing vocals, reading or translation beneath. */
 @Composable
@@ -78,7 +81,7 @@ internal fun LyricLineView(
                 },
     ) {
         if (shown.interlude) {
-            Interlude(shown, position, active, colors)
+            Interlude(shown, position, state, colors)
             return@Column
         }
         val runs =
@@ -88,7 +91,7 @@ internal fun LyricLineView(
             }
         val singer = colors.singer(shown)
         runs.forEach { run ->
-            RunText(run, active, position, singer, colors, align)
+            RunText(run, state, position, singer, colors, align)
         }
     }
 }
@@ -96,34 +99,40 @@ internal fun LyricLineView(
 @Composable
 private fun RunText(
     run: LyricRun,
-    lineActive: Boolean,
+    state: LineState,
     position: State<Long>,
     singer: Color,
     colors: LyricColors,
     align: TextAlign,
 ) {
     val style = remember(run.text, run.background, align) { styleFor(run, align) }
-    val sweeps = lineActive && run.words.isNotEmpty()
-    if (sweeps) {
+    val active = state == LineState.ACTIVE
+    val passed = state == LineState.PASSED
+    val sungTarget =
+        when {
+            active && run.background -> colors.backing
+            active -> singer
+            passed && run.background -> colors.passed(colors.backing)
+            passed -> colors.passed(singer)
+            else -> colors.unsung
+        }
+    val unsungTarget = if (passed) colors.passed(colors.unsung) else colors.unsung
+    val sung by animateColorAsState(sungTarget, tween(LYRIC_COLOR_MS), label = "sung")
+    val unsung by animateColorAsState(unsungTarget, tween(LYRIC_COLOR_MS), label = "unsung")
+    if (run.words.isNotEmpty()) {
         SweepText(
             text = run.text,
             words = run.words,
             position = position,
             style = style,
-            sung = if (run.background) colors.backing else singer,
-            unsung = colors.unsung,
+            sung = sung,
+            unsung = unsung,
             modifier = Modifier.fillMaxWidth(),
         )
     } else {
-        val color =
-            when {
-                lineActive && run.background -> colors.backing
-                lineActive -> singer
-                else -> colors.unsung
-            }
         BasicText(
             text = run.text,
-            style = style.copy(color = color),
+            style = style.copy(color = if (active || passed) sung else unsung),
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -134,7 +143,7 @@ private fun RunText(
 private fun Interlude(
     line: LyricLine,
     position: State<Long>,
-    active: Boolean,
+    state: LineState,
     colors: LyricColors,
 ) {
     val words =
@@ -150,20 +159,31 @@ private fun Interlude(
             )
         }
     val style = LyricType.copy(textAlign = TextAlign.Center)
+    val active = state == LineState.ACTIVE
+    val passed = state == LineState.PASSED
+    val sungTarget =
+        when {
+            active -> colors.lead
+            passed -> colors.passed(colors.lead)
+            else -> colors.unsung
+        }
+    val unsungTarget = if (passed) colors.passed(colors.unsung) else colors.unsung
+    val sung by animateColorAsState(sungTarget, tween(LYRIC_COLOR_MS), label = "interludeSung")
+    val unsung by animateColorAsState(unsungTarget, tween(LYRIC_COLOR_MS), label = "interludeUnsung")
     if (active) {
         SweepText(
             text = line.text,
             words = words,
             position = position,
             style = style,
-            sung = colors.lead,
-            unsung = colors.unsung,
+            sung = sung,
+            unsung = unsung,
             modifier = Modifier.fillMaxWidth(),
         )
     } else {
         BasicText(
             text = line.text,
-            style = style.copy(color = colors.unsung),
+            style = style.copy(color = if (passed) sung else unsung),
             modifier = Modifier.fillMaxWidth(),
         )
     }

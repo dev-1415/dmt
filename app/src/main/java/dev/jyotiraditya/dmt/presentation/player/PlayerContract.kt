@@ -42,6 +42,7 @@ enum class DmtView {
     SOURCE_KINDS,
     SOURCE_FORM,
     PERMISSIONS,
+    LIBRARY_TABS,
 }
 
 data class DmtState(
@@ -57,7 +58,7 @@ data class DmtState(
     val filteredFolders: List<Folder> = emptyList(),
     val filteredGenres: List<Genre> = emptyList(),
     val playlists: List<Playlist> = emptyList(),
-    val view: DmtView = DmtView.LIBRARY,
+    val view: DmtView = DmtView.FOLDERS,
     val sourceForm: SourceForm = SourceForm(SourceMode.JELLYFIN),
     /** Whether a source is signing in from its form. */
     val connecting: Boolean = false,
@@ -67,6 +68,8 @@ data class DmtState(
     val openAlbum: String? = null,
     val openArtist: String? = null,
     val openFolder: String? = null,
+    /** A track the folder view should scroll to once it opens, then clear. */
+    val scrollToTrackId: String? = null,
     val openGenre: String? = null,
     val openPlaylist: String? = null,
     val nowPlayingId: String? = null,
@@ -150,6 +153,9 @@ sealed interface DmtAction {
 
     data class OpenFolder(val path: String?) : DmtAction
 
+    /** Asks the open folder to scroll to [id], or clears the request at null. */
+    data class ScrollToTrack(val id: String?) : DmtAction
+
     data class OpenGenre(val name: String?) : DmtAction
 
     data class OpenPlaylist(val name: String?) : DmtAction
@@ -185,6 +191,9 @@ sealed interface DmtAction {
     data class RemoveAt(val index: Int) : DmtAction
 
     data object OpenLyricsSources : DmtAction
+
+    /** Writes the lyrics on screen into the playing track's file. */
+    data object EmbedLyrics : DmtAction
 
     data object CloseLyricsSources : DmtAction
 

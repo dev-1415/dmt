@@ -59,6 +59,52 @@ class LibraryTest {
     }
 
     @Test
+    fun albumNamesDifferingOnlyByApostrophesStayTogether() {
+        val albums =
+            listOf(
+                track(1, album = "1989 (Taylor's Version)", albumArtist = "Taylor Swift"),
+                track(2, album = "1989 (Taylor’s Version)", albumArtist = "Taylor Swift"),
+                track(3, album = "1989 (Taylor s Version)", albumArtist = "Taylor Swift"),
+            )
+                .toAlbums()
+        assertEquals(1, albums.size)
+        assertEquals(3, albums.single().tracks.size)
+    }
+
+    @Test
+    fun tracksWithAndWithoutAlbumArtistStayTogether() {
+        val albums =
+            listOf(
+                track(1, album = "Reputation", artist = "Taylor Swift", albumArtist = "Taylor Swift"),
+                track(2, album = "Reputation", artist = "Taylor Swift"),
+            )
+                .toAlbums()
+        assertEquals(1, albums.size)
+        assertEquals(2, albums.single().tracks.size)
+    }
+
+    @Test
+    fun albumArtistFeaturingSuffixDoesNotSplitAnAlbum() {
+        val albums =
+            listOf(
+                track(1, album = "Reputation", albumArtist = "Taylor Swift"),
+                track(2, album = "Reputation", albumArtist = "Taylor Swift feat. Ed Sheeran"),
+            )
+                .toAlbums()
+        assertEquals(1, albums.size)
+    }
+
+    @Test
+    fun albumLookupFindsTracksWhoseAlbumArtistIsBlank() = runBlocking {
+        val named = track(1, album = "Reputation", albumArtist = "Taylor Swift")
+        val blank = track(2, album = "Reputation", artist = "Taylor Swift")
+        val library = listOf(named, blank).toLibrary()
+
+        assertEquals(library.albumOf(named), library.albumOf(blank))
+        assertEquals(1, library.albums.size)
+    }
+
+    @Test
     fun discFoldersOfOneAlbumStayTogether() {
         val albums =
             listOf(
@@ -103,5 +149,52 @@ class LibraryTest {
 
         assertEquals(listOf(2L, 1L), byTitle.map { it.id })
         assertSame(byTitle, library.tracksSortedBy(LibrarySort.TITLE))
+    }
+
+    @Test
+    fun folderForestKeepsIntermediateFolders() = runBlocking {
+        val library =
+            listOf(
+                track(1, path = "/storage/emulated/0/Music/Artist/Album/1.flac"),
+                track(2, path = "/storage/emulated/0/Music/Artist/Album/2.flac"),
+                track(3, path = "/storage/emulated/0/Music/Other/3.flac"),
+            )
+                .toLibrary()
+        val root = library.folderRoots.single()
+        assertEquals("/storage/emulated/0", root.path)
+        val music = root.children.single { it.name == "Music" }
+        val artist = music.children.single { it.name == "Artist" }
+        val album = artist.children.single { it.name == "Album" }
+        assertEquals(2, album.tracks.size)
+        assertEquals(2, artist.allTracks.size)
+        assertSame(artist, library.folderNode(artist.path))
+        assertSame(album, library.folder(album.path))
+    }
+
+    @Test
+    fun folderForestSeparatesStorageVolumes() = runBlocking {
+        val library =
+            listOf(
+                track(1, path = "/storage/emulated/0/Music/1.flac"),
+                track(2, path = "/storage/1234-5678/Music/2.flac"),
+            )
+                .toLibrary()
+        assertEquals(
+            setOf("/storage/emulated/0", "/storage/1234-5678"),
+            library.folderRoots.map { it.path }.toSet(),
+        )
+    }
+
+    @Test
+    fun folderSortOrdersTracksBothWays() {
+        val tracks = listOf(track(1, title = "b"), track(2, title = "a"))
+        assertEquals(
+            listOf(2L, 1L),
+            FolderSort.TITLE.sorted(tracks, ascending = true).map { it.id },
+        )
+        assertEquals(
+            listOf(1L, 2L),
+            FolderSort.TITLE.sorted(tracks, ascending = false).map { it.id },
+        )
     }
 }

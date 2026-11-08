@@ -3,12 +3,12 @@ package dev.jyotiraditya.dmt.presentation.nowplaying.details
 import androidx.annotation.OptIn
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +36,7 @@ import dev.jyotiraditya.dmt.util.asTime
 /** The playing track's format, the path its sound takes to the speaker, and its tags. */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun DetailsPage(state: DmtState, player: Player) {
+internal fun DetailsPage(state: DmtState, player: Player, modifier: Modifier = Modifier) {
     val speed = rememberPlaybackSpeedState(player).playbackSpeed
     val stages =
         remember(state.tech, state.route, speed) { signalChain(state.tech, state.route, speed) }
@@ -44,24 +44,22 @@ internal fun DetailsPage(state: DmtState, player: Player) {
     val file =
         remember(stages) { stages.firstOrNull { it.title == R.string.chain_file }?.facts.orEmpty() }
 
-    Column(
-        modifier =
-            Modifier.fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Margin),
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = Margin),
     ) {
-        Summary(state.quality, file, track)
+        item { Summary(state.quality, file, track) }
         stages.forEach { stage ->
-            Heading(stringResource(stage.title))
-            stage.facts.forEach { fact ->
+            item { Heading(stringResource(stage.title)) }
+            items(stage.facts) { fact ->
                 FactRow(label = stringResource(fact.field.label), value = fact.value)
             }
         }
-        Heading(stringResource(R.string.player_track_info))
-        trackInfo(state, track).forEach { row ->
+        item { Heading(stringResource(R.string.player_track_info)) }
+        items(trackInfo(state, track)) { row ->
             FactRow(label = stringResource(row.label), value = row.value)
         }
-        Spacer(modifier = Modifier.height(32.dp))
+        item { Spacer(modifier = Modifier.height(32.dp)) }
     }
 }
 

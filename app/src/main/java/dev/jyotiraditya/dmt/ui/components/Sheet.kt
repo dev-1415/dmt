@@ -36,11 +36,18 @@ class DmtSheetScope internal constructor(private val close: () -> Unit) {
     fun dismiss() = close()
 }
 
-/** A bottom sheet on the page background, with a short square drag handle in ink. */
+/**
+ * A bottom sheet on the page background, with a short square drag handle in ink. Set
+ * [gesturesEnabled] to false when the content scrolls, so its fling isn't fought by the sheet.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DmtSheet(onDismiss: () -> Unit, content: @Composable DmtSheetScope.() -> Unit) {
-    val state = rememberModalBottomSheetState()
+fun DmtSheet(
+    onDismiss: () -> Unit,
+    gesturesEnabled: Boolean = true,
+    content: @Composable DmtSheetScope.() -> Unit,
+) {
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val dismissed by rememberUpdatedState(onDismiss)
     val sheet =
@@ -54,8 +61,20 @@ fun DmtSheet(onDismiss: () -> Unit, content: @Composable DmtSheetScope.() -> Uni
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = state,
+        sheetGesturesEnabled = gesturesEnabled,
         scrimColor = Dark.copy(alpha = 0.6f),
-        dragHandle = { BottomSheetDefaults.DragHandle(width = 40.dp, height = 4.dp, color = Ink) },
+        dragHandle =
+            if (gesturesEnabled) {
+                {
+                    BottomSheetDefaults.DragHandle(
+                        width = 40.dp,
+                        height = 4.dp,
+                        color = Ink,
+                    )
+                }
+            } else {
+                null
+            },
     ) {
         Column {
             sheet.content()

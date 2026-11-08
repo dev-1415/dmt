@@ -41,7 +41,7 @@ class LyricsRepository @Inject constructor(@param:ApplicationContext private val
 
     /** The lyrics kept under [key] while [files] stay unchanged, or else those [read] returns. */
     private inline fun cached(key: String, files: List<File>, read: () -> Lyrics?): Lyrics? {
-        val stamp = files.map(File::lastModified)
+        val stamp = files.map { it.lastModified() to it.length() }
         val held = cache.get(key)
         if (held != null && held.stamp == stamp) return held.lyrics
         return read().also { cache.put(key, Read(stamp, it)) }
@@ -49,9 +49,9 @@ class LyricsRepository @Inject constructor(@param:ApplicationContext private val
 
     /**
      * One read of a source; null lyrics when it had none. [stamp] holds when each file it read was
-     * last changed, 0 for a file that was not there.
+     * last changed and how large it was, 0 for a file that was not there.
      */
-    private data class Read(val stamp: List<Long>, val lyrics: Lyrics?)
+    private data class Read(val stamp: List<Pair<Long, Long>>, val lyrics: Lyrics?)
 
     /** Reads by source and path, misses included, kept while their files stay unchanged. */
     private val cache = LruCache<String, Read>(CACHE_TRACKS * LyricsSource.entries.size)

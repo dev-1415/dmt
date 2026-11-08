@@ -2,16 +2,15 @@ package dev.jyotiraditya.dmt.presentation.nowplaying
 
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,8 +43,6 @@ import dev.jyotiraditya.dmt.ui.components.IconChip
 import dev.jyotiraditya.dmt.ui.components.IconTap
 import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
-import dev.jyotiraditya.dmt.ui.theme.Numerals
-import dev.jyotiraditya.dmt.ui.theme.secondary
 import kotlin.math.abs
 
 private const val PLAY_PRESS_SCALE = 0.92f
@@ -178,16 +175,19 @@ internal fun PlayPauseTap(
     )
 }
 
-/** The sleep timer and speed chips, and the queue with how many tracks are left. */
+/** Go to album, details, sleep and speed, shown directly below the cover. */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun Extras(
+internal fun PlayerActions(
     state: DmtState,
     player: Player,
     field: Color,
     ink: Color,
     dispatch: (DmtAction) -> Unit,
-    onOpenQueue: () -> Unit,
+    onOpenAlbum: () -> Unit,
+    onOpenDetails: () -> Unit,
+    lyricsOpen: Boolean,
+    onToggleLyrics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var sheet by rememberSaveable { mutableStateOf<ExtraSheet?>(null) }
@@ -195,8 +195,26 @@ internal fun Extras(
     Row(
         horizontalArrangement = Arrangement.spacedBy(PlayerDimens.ToggleGap),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
     ) {
+        IconChip(
+            icon = DmtIcons.Disc,
+            description = stringResource(R.string.action_go_to_album),
+            value = null,
+            on = false,
+            onClick = onOpenAlbum,
+            ink = ink,
+            field = field,
+        )
+        IconChip(
+            icon = DmtIcons.Info,
+            description = stringResource(R.string.player_tab_details),
+            value = null,
+            on = false,
+            onClick = onOpenDetails,
+            ink = ink,
+            field = field,
+        )
         IconChip(
             icon = DmtIcons.Sleep,
             description = stringResource(R.string.sleep_title),
@@ -224,19 +242,26 @@ internal fun Extras(
             ink = ink,
             field = field,
         )
-        Spacer(modifier = Modifier.weight(1f))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(PlayerDimens.ToggleGap, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier.widthIn(min = PlayerDimens.QueueTarget)
-                    .pressable(onClick = onOpenQueue, label = stringResource(R.string.queue_title))
-                    .padding(vertical = PlayerDimens.ToggleGap),
-        ) {
-            val left = (state.queue.size - state.queuePosition - 1).coerceAtLeast(0)
-            if (left > 0) Text(text = "$left", style = Numerals, color = ink.secondary(field))
-            DmtIcon(icon = DmtIcons.Queue, tint = ink, size = PlayerDimens.QueueGlyph)
+        if (lyricsOpen) {
+            IconChip(
+                icon = DmtIcons.Close,
+                description = stringResource(R.string.lyrics_close),
+                value = null,
+                on = false,
+                onClick = onToggleLyrics,
+                ink = ink,
+                field = field,
+            )
         }
+        IconChip(
+            icon = DmtIcons.Lyrics,
+            description = stringResource(R.string.lyrics_source_title),
+            value = null,
+            on = false,
+            onClick = { dispatch(DmtAction.OpenLyricsSources) },
+            ink = ink,
+            field = field,
+        )
     }
     when (sheet) {
         ExtraSheet.SLEEP -> SleepSheet(state, dispatch, onDismiss = { sheet = null })

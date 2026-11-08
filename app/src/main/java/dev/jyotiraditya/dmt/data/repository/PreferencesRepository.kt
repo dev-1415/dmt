@@ -8,6 +8,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.jyotiraditya.dmt.data.source.local.KEY_ACCENT
 import dev.jyotiraditya.dmt.data.source.local.KEY_ACTIVE_SOURCE
 import dev.jyotiraditya.dmt.data.source.local.KEY_ANIMATED_ART
+import dev.jyotiraditya.dmt.data.source.local.KEY_FOLDER_SORT
+import dev.jyotiraditya.dmt.data.source.local.KEY_FOLDER_SORT_ASCENDING
 import dev.jyotiraditya.dmt.data.source.local.KEY_HIDDEN_FOLDERS
 import dev.jyotiraditya.dmt.data.source.local.KEY_JELLYFIN_DEVICE_ID
 import dev.jyotiraditya.dmt.data.source.local.KEY_KEEP_PITCH
@@ -32,6 +34,8 @@ import dev.jyotiraditya.dmt.data.source.local.KEY_SPEED
 import dev.jyotiraditya.dmt.data.source.local.KEY_STAT_COUNTS
 import dev.jyotiraditya.dmt.data.source.local.KEY_STAT_TOTAL
 import dev.jyotiraditya.dmt.data.source.local.KEY_STOP_ON_DISMISS
+import dev.jyotiraditya.dmt.data.source.local.KEY_START_FOLDER
+import dev.jyotiraditya.dmt.data.source.local.KEY_VISIBLE_LIBRARY_TABS
 import dev.jyotiraditya.dmt.data.source.local.dmtStore
 import dev.jyotiraditya.dmt.data.source.local.encodeCounts
 import dev.jyotiraditya.dmt.data.source.local.encodeSources
@@ -40,9 +44,11 @@ import dev.jyotiraditya.dmt.data.source.local.toSources
 import dev.jyotiraditya.dmt.domain.model.AccentColor
 import dev.jyotiraditya.dmt.domain.model.DmtSettings
 import dev.jyotiraditya.dmt.domain.model.DmtStats
+import dev.jyotiraditya.dmt.domain.model.FolderSort
 import dev.jyotiraditya.dmt.domain.model.LastSession
 import dev.jyotiraditya.dmt.domain.model.LibraryScan
 import dev.jyotiraditya.dmt.domain.model.LibrarySort
+import dev.jyotiraditya.dmt.domain.model.LibraryTab
 import dev.jyotiraditya.dmt.domain.model.LyricsSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -173,6 +179,14 @@ private fun Preferences.toSettings(): DmtSettings = DmtSettings(
     setupDone = this[KEY_SETUP_DONE] ?: false,
     hiddenFolders = this[KEY_HIDDEN_FOLDERS] ?: emptySet(),
     librarySort = this[KEY_LIBRARY_SORT].toEnum(LibrarySort.TITLE),
+    folderSort = this[KEY_FOLDER_SORT].toEnum(FolderSort.TITLE),
+    folderSortAscending = this[KEY_FOLDER_SORT_ASCENDING] ?: true,
+    startFolder = this[KEY_START_FOLDER],
+    visibleLibraryTabs =
+        this[KEY_VISIBLE_LIBRARY_TABS]
+            ?.mapNotNull { name -> LibraryTab.entries.find { it.name == name } }
+            ?.toSet()
+            ?: LibraryTab.entries.toSet(),
     sources = this[KEY_SOURCES]?.toSources().orEmpty(),
     activeSource = this[KEY_ACTIVE_SOURCE],
 )
@@ -191,6 +205,10 @@ private fun MutablePreferences.write(settings: DmtSettings) {
     this[KEY_SETUP_DONE] = settings.setupDone
     this[KEY_HIDDEN_FOLDERS] = settings.hiddenFolders
     this[KEY_LIBRARY_SORT] = settings.librarySort.name
+    this[KEY_FOLDER_SORT] = settings.folderSort.name
+    this[KEY_FOLDER_SORT_ASCENDING] = settings.folderSortAscending
+    putOrRemove(KEY_START_FOLDER, settings.startFolder)
+    this[KEY_VISIBLE_LIBRARY_TABS] = settings.visibleLibraryTabs.map { it.name }.toSet()
     this[KEY_SOURCES] = settings.sources.encodeSources()
     putOrRemove(KEY_ACTIVE_SOURCE, settings.activeSource)
 }

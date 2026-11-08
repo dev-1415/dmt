@@ -2,6 +2,10 @@
 -dontwarn nl.adaptivity.xmlutil.util.SerializationProvider
 -dontwarn nl.adaptivity.xmlutil.util.DefaultSerializationProvider
 
+# Jaudiotagger finds its format readers and writers through its own registry.
+-keep class org.jaudiotagger.** { *; }
+-dontwarn org.jaudiotagger.**
+
 # Loaded via reflection (Class.forName / ServiceLoader), not referenced directly.
 -keep class androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer { <init>(...); }
 -keep class androidx.media3.decoder.midi.MidiRenderer { <init>(...); }

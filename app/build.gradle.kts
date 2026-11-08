@@ -114,6 +114,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.aboutlibraries.core)
     implementation(libs.hilt.android)
+    implementation(libs.jaudiotagger)
     implementation(libs.androidx.profileinstaller)
     baselineProfile(project(":baselineprofile"))
     ksp(libs.hilt.compiler)

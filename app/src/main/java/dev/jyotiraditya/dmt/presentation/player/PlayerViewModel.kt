@@ -1,15 +1,18 @@
 package dev.jyotiraditya.dmt.presentation.player
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.core.base.BaseViewModel
 import dev.jyotiraditya.dmt.core.common.PermissionChecker
 import dev.jyotiraditya.dmt.core.common.UiText
+import dev.jyotiraditya.dmt.data.lyrics.LyricsEmbedder
 import dev.jyotiraditya.dmt.data.repository.AnimatedArtworkRepository
 import dev.jyotiraditya.dmt.data.repository.PlaylistRepository
 import dev.jyotiraditya.dmt.data.repository.PreferencesRepository
@@ -18,6 +21,7 @@ import dev.jyotiraditya.dmt.domain.model.DmtSettings
 import dev.jyotiraditya.dmt.domain.model.LibraryScan
 import dev.jyotiraditya.dmt.domain.model.LibrarySnapshot
 import dev.jyotiraditya.dmt.domain.model.SourceDraft
+import dev.jyotiraditya.dmt.domain.model.TrackSource
 import dev.jyotiraditya.dmt.domain.repository.ArtworkRepository
 import dev.jyotiraditya.dmt.domain.usecase.ConnectSourceUseCase
 import dev.jyotiraditya.dmt.domain.usecase.GetLyricsUseCase
@@ -37,6 +41,7 @@ import dev.jyotiraditya.dmt.util.removeFromQueue
 import dev.jyotiraditya.dmt.util.resolveQueue
 import dev.jyotiraditya.dmt.util.suspendRunCatching
 import dev.jyotiraditya.dmt.util.toQueueRequest
+import dev.jyotiraditya.lyrics.toLrc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -63,6 +68,7 @@ private const val TAG = "PlayerViewModel"
 class PlayerViewModel
 @Inject
 constructor(
+    @ApplicationContext private val context: Context,
     private val playbackConnection: PlaybackConnection,
     permissionChecker: PermissionChecker,
     private val preferencesRepository: PreferencesRepository,
@@ -161,14 +167,29 @@ constructor(
             }
 
             is DmtAction.Show -> {
-                reduce { it.copy(view = intent.view, error = null) }
+                reduce {
+                    it.copy(
+                        view = intent.view,
+                        error = null,
+                        scrollToTrackId = null,
+                        openFolder =
+                            if (intent.view == DmtView.FOLDERS) {
+                                it.settings.startFolder
+                            } else {
+                                it.openFolder
+                            },
+                    )
+                }
             }
 
             is DmtAction.OpenAlbum -> reduce { it.copy(openAlbum = intent.id) }
 
             is DmtAction.OpenArtist -> reduce { it.copy(openArtist = intent.name) }
 
-            is DmtAction.OpenFolder -> reduce { it.copy(openFolder = intent.path) }
+            is DmtAction.OpenFolder ->
+                reduce { it.copy(openFolder = intent.path, scrollToTrackId = null) }
+
+            is DmtAction.ScrollToTrack -> reduce { it.copy(scrollToTrackId = intent.id) }
 
             is DmtAction.OpenGenre -> reduce { it.copy(openGenre = intent.name) }
 
@@ -236,6 +257,8 @@ constructor(
             is DmtAction.RemoveAt -> c?.removeFromQueue(intent.index)
 
             DmtAction.OpenLyricsSources -> lyrics.openSources()
+
+            DmtAction.EmbedLyrics -> embedLyrics()
 
             DmtAction.CloseLyricsSources -> reduce { it.copy(lyricsSourcesOpen = false) }
 
@@ -430,6 +453,23 @@ constructor(
     private fun loadNowPlaying(mediaItem: MediaItem?) {
         details.load(mediaItem, controller?.currentTracks?.playedAudioFormat())
         lyrics.load(mediaItem)
+    }
+
+    /** Writes the lyrics on screen into the playing track's file, replacing any embedded ones. */
+    private fun embedLyrics() {
+        val track = currentState.nowPlayingTrack ?: return
+        val lyrics = currentState.lyrics ?: return
+        if (track.source != TrackSource.LOCAL || track.path.isBlank()) return
+        viewModelScope.launch {
+            LyricsEmbedder.embed(context, track, lyrics.toLrc()).fold(
+                onSuccess = {
+                    notify(UiText(R.string.notice_lyrics_embedded))
+                    // Re-read the file's tags so the library shows the same title and artist.
+                    scan(refresh = true)
+                },
+                onFailure = { reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) } },
+            )
+        }
     }
 
     private fun notify(message: UiText) {

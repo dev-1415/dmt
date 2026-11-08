@@ -23,7 +23,10 @@ dependencyResolutionManagement {
         mavenCentral()
         maven {
             url = uri("https://jitpack.io")
-            content { includeGroup("com.github.philburk") }
+            content {
+                includeGroup("com.github.philburk")
+                includeGroup("com.github.Adonai")
+            }
         }
         maven {
             url = uri("https://raw.githubusercontent.com/imjyotiraditya/dmt-media3/maven/maven")

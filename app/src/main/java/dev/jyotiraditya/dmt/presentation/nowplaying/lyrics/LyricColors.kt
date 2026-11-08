@@ -7,6 +7,7 @@ import dev.jyotiraditya.lyrics.LyricLine
 
 private const val UNSUNG_ALPHA = 0.32f
 private const val BACKING_ALPHA = 0.78f
+private const val PASSED_ALPHA = 0.62f
 
 /** Colours of the lyrics view; dimmed colours are solid so overlapping glyphs don't brighten. */
 @Immutable
@@ -18,6 +19,7 @@ internal data class LyricColors(
     val singers: List<Color>,
     /** Whether each singer is sung in their own colour, else all in [lead]. */
     val bySinger: Boolean,
+    val background: Color,
 ) {
     /** The sung colour of [line]'s singer, so duets stay distinguishable. */
     fun singer(line: LyricLine): Color = when {
@@ -26,6 +28,9 @@ internal data class LyricColors(
         line.singer == 0 -> lead
         else -> singers[(line.singer - 1) % singers.size]
     }
+
+    /** A sung colour kept visible but dimmed for a line that has already been sung. */
+    fun passed(color: Color): Color = color.copy(alpha = PASSED_ALPHA).compositeOver(background)
 
     companion object {
         fun on(ink: Color, background: Color, bySinger: Boolean) = LyricColors(
@@ -43,6 +48,7 @@ internal data class LyricColors(
                     Color(0xFFE6B49C),
                 ),
             bySinger = bySinger,
+            background = background,
         )
     }
 }

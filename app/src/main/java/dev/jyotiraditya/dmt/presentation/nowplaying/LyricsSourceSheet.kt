@@ -23,8 +23,10 @@ import dev.jyotiraditya.dmt.presentation.nowplaying.lyrics.label
 import dev.jyotiraditya.dmt.presentation.player.LyricsSourceStatus
 import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.SelectionMark
+import dev.jyotiraditya.dmt.ui.components.SheetAction
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.pressableSelect
+import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
@@ -36,7 +38,9 @@ fun LyricsSourceSheet(
     trackTitle: String,
     current: LyricsSource,
     sources: Map<LyricsSource, LyricsSourceStatus>,
+    canEmbed: Boolean,
     onPick: (LyricsSource) -> Unit,
+    onEmbed: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     DmtSheet(onDismiss = onDismiss) {
@@ -56,6 +60,16 @@ fun LyricsSourceSheet(
                     onClick = { onPick(source) },
                 )
             }
+        }
+        if (canEmbed) {
+            SheetAction(
+                icon = DmtIcons.Check,
+                label = stringResource(R.string.lyrics_embed),
+                onClick = {
+                    onEmbed()
+                    dismiss()
+                },
+            )
         }
     }
 }

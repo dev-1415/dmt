@@ -1,5 +1,6 @@
 package dev.jyotiraditya.dmt.presentation.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -104,6 +105,7 @@ private fun PlaylistLine(playlist: Playlist, dispatch: (DmtAction) -> Unit) {
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PlaylistDetail(playlist: Playlist, state: DmtState, dispatch: (DmtAction) -> Unit) {
     var picking by remember { mutableStateOf(false) }
@@ -116,6 +118,12 @@ internal fun PlaylistDetail(playlist: Playlist, state: DmtState, dispatch: (DmtA
             DetailHead(
                 title = playlist.name,
                 meta = stringResource(R.string.collection_playlist),
+                tracks = playlist.tracks,
+            )
+        }
+        stickyHeader {
+            DetailActions(
+                title = playlist.name,
                 tracks = playlist.tracks,
                 dispatch = dispatch,
                 action = { ink ->

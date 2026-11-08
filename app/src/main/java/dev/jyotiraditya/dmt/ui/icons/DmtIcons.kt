@@ -14,6 +14,7 @@ object DmtIcons {
     val Repeat = R.drawable.ic_repeat
     val RepeatOne = R.drawable.ic_repeat_one
     val Queue = R.drawable.ic_queue
+    val Lyrics = R.drawable.ic_lyrics
     val PlayNext = R.drawable.ic_play_next
     val AddToQueue = R.drawable.ic_add_to_queue
     val Playlist = R.drawable.ic_playlist
