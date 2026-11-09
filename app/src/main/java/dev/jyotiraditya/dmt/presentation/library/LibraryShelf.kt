@@ -49,6 +49,7 @@ import dev.jyotiraditya.dmt.ui.components.CollectionRow
 import dev.jyotiraditya.dmt.ui.components.CoverTile
 import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.EmptyState
+import dev.jyotiraditya.dmt.ui.components.FolderRow
 import dev.jyotiraditya.dmt.ui.components.RowPlaceholders
 import dev.jyotiraditya.dmt.ui.components.ScrollBar
 import dev.jyotiraditya.dmt.ui.components.SearchBox
@@ -247,7 +248,8 @@ private fun LazyListScope.folderShelf(
         else ->
             items(roots, key = { "root:${it.path}" }) { folder ->
                 val title = folderTitle(folder)
-                CollectionRow(
+                FolderRow(
+                    folder = folder,
                     title = title,
                     detail = folderSummary(folder),
                     onClick = { dispatch(DmtAction.OpenFolder(folder.path)) },

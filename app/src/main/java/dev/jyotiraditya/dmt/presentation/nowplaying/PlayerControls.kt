@@ -14,11 +14,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -34,6 +37,7 @@ import androidx.media3.ui.compose.state.rememberSeekBackButtonState
 import androidx.media3.ui.compose.state.rememberSeekForwardButtonState
 import androidx.media3.ui.compose.state.rememberShuffleButtonState
 import dev.jyotiraditya.dmt.R
+import dev.jyotiraditya.dmt.domain.model.LibraryTab
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.player.ceilMinutes
@@ -57,6 +61,7 @@ internal fun Transport(
     steps: SeekSteps,
     field: Color,
     ink: Color,
+    onVolume: (LayoutCoordinates) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val playPause = rememberPlayPauseButtonState(player)
@@ -66,7 +71,7 @@ internal fun Transport(
     val seekForward = rememberSeekForwardButtonState(player)
     val shuffle = rememberShuffleButtonState(player)
     val repeat = rememberRepeatButtonState(player, REPEAT_MODES)
-    var volumeSheet by rememberSaveable { mutableStateOf(false) }
+    var volumeAnchor by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
@@ -115,10 +120,11 @@ internal fun Transport(
         IconTap(
             icon = DmtIcons.Volume,
             description = stringResource(R.string.player_volume),
-            onClick = { volumeSheet = true },
+            onClick = { volumeAnchor?.let(onVolume) },
             ink = ink,
             size = PlayerDimens.SkipButton,
             iconSize = PlayerDimens.SkipGlyph,
+            modifier = Modifier.onGloballyPositioned { volumeAnchor = it },
         )
         Spacer(modifier = Modifier.weight(1f))
         IconTap(
@@ -144,9 +150,6 @@ internal fun Transport(
             ink = ink,
             field = field,
         )
-    }
-    if (volumeSheet) {
-        VolumeSheet(onDismiss = { volumeSheet = false })
     }
 }
 
@@ -209,15 +212,17 @@ internal fun PlayerActions(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
     ) {
-        IconChip(
-            icon = DmtIcons.Disc,
-            description = stringResource(R.string.action_go_to_album),
-            value = null,
-            on = false,
-            onClick = onOpenAlbum,
-            ink = ink,
-            field = field,
-        )
+        if (LibraryTab.ALBUMS in state.settings.visibleLibraryTabs) {
+            IconChip(
+                icon = DmtIcons.Disc,
+                description = stringResource(R.string.action_go_to_album),
+                value = null,
+                on = false,
+                onClick = onOpenAlbum,
+                ink = ink,
+                field = field,
+            )
+        }
         IconChip(
             icon = DmtIcons.Info,
             description = stringResource(R.string.player_tab_details),

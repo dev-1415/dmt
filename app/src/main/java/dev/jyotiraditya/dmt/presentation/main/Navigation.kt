@@ -2,10 +2,13 @@ package dev.jyotiraditya.dmt.presentation.main
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,13 +22,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
@@ -50,6 +66,9 @@ import dev.jyotiraditya.dmt.ui.theme.Surface
 import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
 import dev.jyotiraditya.dmt.ui.theme.inkOn
 import dev.jyotiraditya.dmt.ui.theme.secondary
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.floor
 
 /** The top-level destinations, with the label and icon they are shown with. */
 enum class Place(
@@ -58,13 +77,13 @@ enum class Place(
     val libraryTab: LibraryTab? = null,
 ) {
     QUEUE(R.string.nav_queue, DmtIcons.Queue),
-    NOW_PLAYING(R.string.nav_now_playing, DmtIcons.Play),
-    FOLDERS(R.string.library_tab_folders, DmtIcons.Library, LibraryTab.FOLDERS),
-    TRACKS(R.string.library_tab_tracks, DmtIcons.Playlist, LibraryTab.TRACKS),
+    NOW_PLAYING(R.string.nav_now_playing, DmtIcons.NowPlaying),
+    FOLDERS(R.string.library_tab_folders, DmtIcons.Folder, LibraryTab.FOLDERS),
+    TRACKS(R.string.library_tab_tracks, DmtIcons.Tracks, LibraryTab.TRACKS),
     ALBUMS(R.string.library_tab_albums, DmtIcons.Disc, LibraryTab.ALBUMS),
     ARTISTS(R.string.library_tab_artists, DmtIcons.Person, LibraryTab.ARTISTS),
     PLAYLISTS(R.string.library_tab_playlists, DmtIcons.Playlist, LibraryTab.PLAYLISTS),
-    GENRES(R.string.library_tab_genres, DmtIcons.Library, LibraryTab.GENRES),
+    GENRES(R.string.library_tab_genres, DmtIcons.Genre, LibraryTab.GENRES),
     LISTEN(R.string.nav_listen, DmtIcons.Home),
     ;
 
@@ -125,9 +144,10 @@ internal fun BackBar(
 }
 
 /** The top-level destinations and Settings, pinned below the content. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BottomBar(
-    selected: Float?,
+    pagerState: PagerState,
     places: List<Place>,
     settingsOpen: Boolean,
     field: Color,
@@ -138,6 +158,8 @@ internal fun BottomBar(
     val background = field.darkenedForPlayer()
     val ink = background.inkOn()
     val rest = ink.secondary(background)
+    val listState = rememberLazyListState()
+    val selectedIndex = pagerState.currentPage.coerceIn(0, places.lastIndex)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
@@ -149,29 +171,85 @@ internal fun BottomBar(
                 .height(60.dp)
                 .padding(horizontal = Margin),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-        ) {
-            places.forEachIndexed { index, p ->
-                val factor =
-                    if (selected != null) {
-                        (1f - kotlin.math.abs(selected - index)).coerceIn(0f, 1f)
-                    } else {
-                        0f
-                    }
-                Text(
-                    text = stringResource(p.label),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = lerp(rest, ink, factor),
-                    modifier =
-                        Modifier.pressable(
+        BoxWithConstraints(modifier = Modifier.weight(1f).height(40.dp)) {
+            val tabWidth = 44.dp
+            val fits = tabWidth * places.size <= maxWidth
+            if (fits) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().align(Alignment.Center),
+                ) {
+                    places.forEachIndexed { index, p ->
+                        BottomTab(
+                            place = p,
+                            factor = if (!settingsOpen && index == selectedIndex) 1f else 0f,
+                            ink = ink,
+                            rest = rest,
                             onClick = { onPlace(p) },
-                            role = Role.Tab,
-                            label = stringResource(p.label),
+                            modifier = Modifier.weight(1f),
                         )
-                            .padding(vertical = 14.dp),
-                )
+                    }
+                }
+            } else {
+                LaunchedEffect(selectedIndex) {
+                    val info = listState.layoutInfo
+                    val item = info.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+                    val hidden =
+                        item == null ||
+                            item.offset < info.viewportStartOffset ||
+                            item.offset + item.size > info.viewportEndOffset
+                    if (hidden) listState.animateScrollToItem(selectedIndex)
+                }
+                LazyRow(
+                    state = listState,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth().align(Alignment.Center),
+                ) {
+                    itemsIndexed(places) { index, p ->
+                        BottomTab(
+                            place = p,
+                            factor = if (!settingsOpen && index == selectedIndex) 1f else 0f,
+                            ink = ink,
+                            rest = rest,
+                            onClick = { onPlace(p) },
+                        )
+                    }
+                }
+            }
+            if (!settingsOpen) {
+                Canvas(
+                    modifier =
+                        Modifier.align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(2.dp),
+                ) {
+                    val selected = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                    val basePage = floor(selected).toInt().coerceIn(0, places.lastIndex)
+                    val fraction = (selected - basePage).coerceIn(0f, 1f)
+                    fun centerOf(index: Int): Float? =
+                        if (fits) {
+                            if (index in places.indices) {
+                                (index + 0.5f) * size.width / places.size
+                            } else {
+                                null
+                            }
+                        } else {
+                            listState.layoutInfo.visibleItemsInfo
+                                .firstOrNull { it.index == index }
+                                ?.let { it.offset + it.size / 2f }
+                        }
+                    val current = centerOf(basePage) ?: return@Canvas
+                    val next = centerOf((basePage + 1).coerceAtMost(places.lastIndex))
+                    val center =
+                        if (next != null) current + (next - current) * fraction else current
+                    val progress = 1f - abs(2f * fraction - 1f)
+                    val width = 24.dp.toPx() + 24.dp.toPx() * progress
+                    drawRect(
+                        color = Color.White,
+                        topLeft = Offset(center - width / 2f, 0f),
+                        size = Size(width, size.height),
+                    )
+                }
             }
         }
         IconTap(
@@ -185,6 +263,46 @@ internal fun BottomBar(
             iconSize = 22.dp,
             modifier = Modifier.padding(start = 8.dp),
         )
+    }
+}
+
+/** One section tab: its icon and a long-press name. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun BottomTab(
+    place: Place,
+    factor: Float,
+    ink: Color,
+    rest: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = stringResource(place.label)
+    val tooltipState = rememberTooltipState()
+    val scope = rememberCoroutineScope()
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        TooltipBox(
+            positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+            tooltip = { PlainTooltip { Text(label) } },
+            state = tooltipState,
+            enableUserInput = false,
+            focusable = false,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier =
+                    Modifier.combinedClickable(
+                        onClickLabel = label,
+                        role = Role.Tab,
+                        onLongClick = { scope.launch { tooltipState.show() } },
+                        onClick = onClick,
+                    )
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                DmtIcon(icon = place.icon, tint = lerp(rest, ink, factor), size = 24.dp)
+            }
+        }
     }
 }
 

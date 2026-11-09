@@ -13,8 +13,8 @@ internal data class Gap(val min: Dp, val share: Float, val max: Dp)
 
 /** The playing page's gaps, from the top edge to the bottom edge. */
 internal object PlayingGaps {
-    val Top = Gap(min = 8.dp, share = 1f, max = 40.dp)
-    val CoverToTitle = Gap(min = 20.dp, share = 1f, max = 36.dp)
+    val Top = Gap(min = 16.dp, share = 1f, max = 64.dp)
+    val CoverToTitle = Gap(min = 4.dp, share = 1f, max = 8.dp)
     val TitleToSeek = Gap(min = 12.dp, share = 0.5f, max = 20.dp)
     val SeekToTransport = Gap(min = 16.dp, share = 1f, max = 36.dp)
     val TransportToExtras = Gap(min = 16.dp, share = 1f, max = 32.dp)

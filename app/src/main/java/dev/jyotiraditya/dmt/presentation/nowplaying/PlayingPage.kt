@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,45 +93,60 @@ internal fun PlayingPage(
 ) {
     val ink = field.inkOn()
     val dim = ink.secondary(field)
-    PlayingLayout(
-        cover = cover,
-        title = {
-            Column {
-                PlayerActions(
-                    state = state,
-                    player = player,
-                    field = field,
-                    ink = ink,
-                    dispatch = dispatch,
-                    onOpenAlbum = onOpenAlbum,
-                    onOpenDetails = onOpenDetails,
-                    lyricsOpen = lyricsOpen,
-                    onToggleLyrics = onToggleLyrics,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                AnimatedVisibility(
-                    visible = !lyricsOpen && state.lyrics != null,
-                    enter = expandVertically(tween(240)) + fadeIn(tween(240)),
-                    exit = shrinkVertically(tween(240)) + fadeOut(tween(240)),
-                ) {
-                    CurrentLyricLine(
+    var volumeAnchor by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        PlayingLayout(
+            cover = cover,
+            title = {
+                Column {
+                    PlayerActions(
                         state = state,
                         player = player,
-                        background = field,
-                        active = active,
-                        onClick = onToggleLyrics,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        field = field,
+                        ink = ink,
+                        dispatch = dispatch,
+                        onOpenAlbum = onOpenAlbum,
+                        onOpenDetails = onOpenDetails,
+                        lyricsOpen = lyricsOpen,
+                        onToggleLyrics = onToggleLyrics,
+                        modifier = Modifier.padding(bottom = 0.dp),
                     )
+                    AnimatedVisibility(
+                        visible = !lyricsOpen && state.lyrics != null,
+                        enter = expandVertically(tween(240)) + fadeIn(tween(240)),
+                        exit = shrinkVertically(tween(240)) + fadeOut(tween(240)),
+                    ) {
+                        CurrentLyricLine(
+                            state = state,
+                            player = player,
+                            background = field,
+                            active = active,
+                            onClick = onToggleLyrics,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    TrackTitle(state, ink, dim, active, onOpenArtist)
                 }
-                TrackTitle(state, ink, dim, active, onOpenArtist)
-            }
-        },
-        seek = { SeekRow(state, player, field, ink, dim) },
-        transport = { Transport(player, steps, field, ink) },
-        extras = { Spacer(modifier = Modifier.height(0.dp)) },
-        maxCover = PlayerDimens.MaxCover,
-        modifier = Modifier.fillMaxSize().padding(horizontal = Margin),
-    )
+            },
+            seek = { SeekRow(state, player, field, ink, dim) },
+            transport = {
+                Transport(
+                    player = player,
+                    steps = steps,
+                    field = field,
+                    ink = ink,
+                    onVolume = { volumeAnchor = it },
+                )
+            },
+            extras = { Spacer(modifier = Modifier.height(0.dp)) },
+            maxCover = PlayerDimens.MaxCover,
+            modifier = Modifier.fillMaxSize().padding(horizontal = Margin),
+        )
+        val anchor = volumeAnchor
+        if (anchor != null) {
+            VolumePopup(anchor = anchor, onDismiss = { volumeAnchor = null })
+        }
+    }
 }
 
 /**

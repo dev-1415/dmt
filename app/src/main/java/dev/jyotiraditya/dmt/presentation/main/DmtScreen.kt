@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -33,8 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.media3.common.Player
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.LyricsSource
@@ -88,8 +92,12 @@ fun DmtScreen(
     val pager = rememberPagerState(pageCount = { visiblePlaces.size })
     val place = visiblePlaces.getOrNull(pager.currentPage) ?: visiblePlaces.first()
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    // A search field must not reopen the keyboard when the app comes back to the foreground.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { focusManager.clearFocus(force = true) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var settingsReturn by rememberSaveable { mutableStateOf(Place.QUEUE.ordinal) }
+    var queueScrollRequest by remember { mutableStateOf(false) }
     val selected = if (settingsOpen) null else pager.currentPage + pager.currentPageOffsetFraction
 
     fun go(next: Place) {
@@ -153,6 +161,7 @@ fun DmtScreen(
     // Keeps the library view in step with the section the pager settles on.
     LaunchedEffect(pager, visiblePlaces) {
         snapshotFlow { pager.settledPage }.collect { page ->
+            focusManager.clearFocus()
             visiblePlaces.getOrNull(page)?.view?.let { dispatch(DmtAction.Show(it)) }
         }
     }
@@ -209,14 +218,18 @@ fun DmtScreen(
     }
 
     CompositionLocalProvider(LocalArtwork provides artwork, LocalPlayer provides player) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().imePadding()) {
             val rail = windowShape().rail
             val openPlace = { next: Place ->
                 if (settingsOpen) closeSettings()
+                if (next == Place.QUEUE) queueScrollRequest = true
+                if (next == Place.FOLDERS && place == Place.FOLDERS) {
+                    dispatch(DmtAction.ResetFolder)
+                }
                 go(next)
             }
             if (!rail) {
-                if (back != null) {
+                if (back != null && place != Place.FOLDERS) {
                     BackBar(label = back.label, field = field, onBack = ::goBack)
                 } else {
                     Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
@@ -266,6 +279,8 @@ fun DmtScreen(
                                             player = player,
                                             tint = field.darkenedForPlayer(),
                                             dispatch = dispatch,
+                                            scrollToCurrent = queueScrollRequest,
+                                            onScrolledToCurrent = { queueScrollRequest = false },
                                         )
 
                                     Place.NOW_PLAYING ->
@@ -329,7 +344,7 @@ fun DmtScreen(
                 Spacer(modifier = Modifier.height(navBottom))
             } else {
                 BottomBar(
-                    selected = selected,
+                    pagerState = pager,
                     places = visiblePlaces,
                     settingsOpen = settingsOpen,
                     field = field,

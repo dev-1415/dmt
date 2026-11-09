@@ -172,15 +172,12 @@ constructor(
                         view = intent.view,
                         error = null,
                         scrollToTrackId = null,
-                        openFolder =
-                            if (intent.view == DmtView.FOLDERS) {
-                                it.settings.startFolder
-                            } else {
-                                it.openFolder
-                            },
                     )
                 }
             }
+
+            DmtAction.ResetFolder ->
+                reduce { it.copy(openFolder = it.settings.startFolder) }
 
             is DmtAction.OpenAlbum -> reduce { it.copy(openAlbum = intent.id) }
 
@@ -213,6 +210,33 @@ constructor(
             is DmtAction.RemoveFromPlaylist ->
                 mutatePlaylists {
                     playlistRepository.removeTrack(intent.name, intent.path)
+                }
+
+            is DmtAction.ImportPlaylist ->
+                viewModelScope.launch(Dispatchers.IO) {
+                    val playlist = playlistRepository.import(intent.uri, currentState.tracks)
+                    if (playlist == null) {
+                        reduce { it.copy(error = UiText(R.string.error_playlist_import)) }
+                    } else {
+                        val playlists = playlistRepository.load(currentState.tracks)
+                        reduce { it.copy(playlists = playlists) }
+                        withContext(Dispatchers.Main) {
+                            notify(UiText(R.string.notice_playlist_imported, playlist.name))
+                        }
+                    }
+                }
+
+            is DmtAction.ExportPlaylist ->
+                viewModelScope.launch(Dispatchers.IO) {
+                    val exported =
+                        playlistRepository.export(intent.name, intent.uri, currentState.tracks)
+                    if (exported) {
+                        withContext(Dispatchers.Main) {
+                            notify(UiText(R.string.notice_playlist_exported, intent.name))
+                        }
+                    } else {
+                        reduce { it.copy(error = UiText(R.string.error_playlist_export)) }
+                    }
                 }
 
             is DmtAction.PlayAt ->
@@ -470,7 +494,15 @@ constructor(
         val track = currentState.nowPlayingTrack ?: return
         val lyrics = currentState.lyrics ?: return
         if (track.source != TrackSource.LOCAL || track.path.isBlank()) return
+        val c = controller ?: return
+        val items = (0 until c.mediaItemCount).map { c.getMediaItemAt(it) }
+        val index = c.currentMediaItemIndex
+        val position = c.currentPosition
+        val wasPlaying = c.isPlaying
+        // Stop playback so the player releases the file before the tag writer renames it.
+        c.stop()
         viewModelScope.launch {
+            delay(500)
             LyricsEmbedder.embed(context, track, lyrics.toLrc()).fold(
                 onSuccess = {
                     notify(UiText(R.string.notice_lyrics_embedded))
@@ -479,6 +511,9 @@ constructor(
                 },
                 onFailure = { reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) } },
             )
+            c.setMediaItems(items, index, position)
+            c.prepare()
+            if (wasPlaying) c.play()
         }
     }
 

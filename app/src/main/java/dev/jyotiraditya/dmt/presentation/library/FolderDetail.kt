@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.DmtSettings
@@ -47,15 +50,23 @@ import dev.jyotiraditya.dmt.ui.components.ChoiceRow
 import dev.jyotiraditya.dmt.ui.components.CollectionRow
 import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.EmptyState
+import dev.jyotiraditya.dmt.ui.components.FolderCover
+import dev.jyotiraditya.dmt.ui.components.FolderRow
 import dev.jyotiraditya.dmt.ui.components.IconTap
 import dev.jyotiraditya.dmt.ui.components.ScrollBar
 import dev.jyotiraditya.dmt.ui.components.SheetAction
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.TextLink
 import dev.jyotiraditya.dmt.ui.components.TrackRow
+import dev.jyotiraditya.dmt.ui.components.animateFieldAsState
+import dev.jyotiraditya.dmt.ui.components.background
+import dev.jyotiraditya.dmt.ui.components.rememberFieldColor
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
+import dev.jyotiraditya.dmt.ui.theme.Ground
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
+import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
+import dev.jyotiraditya.dmt.ui.theme.inkOn
 
 /** A folder's subfolders and direct tracks, with the folder's sort controls. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -78,7 +89,7 @@ internal fun FolderDetail(
     val openTrackMenu = rememberTrackMenu(state, dispatch, libraryNavigation(dispatch))
     val playing = rememberWantsPlayback()
     val listState = rememberLazyListState()
-    val stickyOffset = with(LocalDensity.current) { 72.dp.roundToPx() }
+    val stickyOffset = with(LocalDensity.current) { 120.dp.roundToPx() }
     var actions by remember { mutableStateOf<Pair<String, List<Track>>?>(null) }
     actions?.let { (title, tracks) ->
         ActionSheet(
@@ -98,7 +109,7 @@ internal fun FolderDetail(
         }
         val parentPath = folder.path.substringBeforeLast('/', missingDelimiterValue = "")
         val parent = parentPath.takeIf { it.isNotEmpty() }?.let(state.library::folder)
-        val base = 3 // header, sticky actions, spacer
+        val base = 3 // sticky header, cover, spacer
         val up = if (parent != null) 1 else 0
         val children = folder.children.size
         val sort = if (sortedTracks.isNotEmpty()) 1 else 0
@@ -115,31 +126,24 @@ internal fun FolderDetail(
             contentPadding = PaddingValues(bottom = LocalContentBottom.current),
             modifier = Modifier.fillMaxSize(),
         ) {
-            item {
-                DetailHead(
-                    folderTitle(folder),
-                    folder.location,
-                    sortedAllTracks,
-                    tint = tint,
+            item(key = "cover:${folder.path}") {
+                FolderCover(
+                    folder = folder,
+                    columns = 4,
+                    rows = 3,
+                    background = tint ?: Ground,
+                    modifier =
+                        Modifier.padding(horizontal = Margin, vertical = 12.dp)
+                            .fillMaxWidth()
+                            .aspectRatio(4f / 3f),
                 )
             }
             stickyHeader {
-                DetailActions(
-                    title = folderTitle(folder),
+                FolderHeader(
+                    folder = folder,
                     tracks = sortedAllTracks,
-                    dispatch = dispatch,
                     tint = tint,
-                    action = { ink ->
-                        IconTap(
-                            icon = DmtIcons.Search,
-                            description = stringResource(R.string.search_hint),
-                            onClick = {
-                                dispatch(DmtAction.OpenFolder(null))
-                                dispatch(DmtAction.Query(""))
-                            },
-                            ink = ink,
-                        )
-                    },
+                    dispatch = dispatch,
                 )
             }
             item { Spacer(modifier = Modifier.height(12.dp)) }
@@ -159,6 +163,56 @@ internal fun FolderDetail(
         ScrollBar(
             state = listState,
             modifier = Modifier.align(Alignment.CenterEnd),
+        )
+    }
+}
+
+/** The folder's name and details, pinned above its play, shuffle, queue and search row. */
+@Composable
+private fun FolderHeader(
+    folder: Folder,
+    tracks: List<Track>,
+    tint: Color?,
+    dispatch: (DmtAction) -> Unit,
+) {
+    val seed = tracks.firstOrNull()
+    val ownField = rememberFieldColor(seed)
+    val field = tint ?: ownField.darkenedForPlayer()
+    val paint by animateFieldAsState(field)
+    val ink = field.inkOn()
+    Column(modifier = Modifier.fillMaxWidth().background { paint }) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Margin, vertical = 8.dp)) {
+            Text(
+                text = folderTitle(folder),
+                style = MaterialTheme.typography.headlineSmall,
+                color = ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = folderSummary(folder),
+                style = MaterialTheme.typography.bodySmall,
+                color = ink.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        DetailActions(
+            title = folderTitle(folder),
+            tracks = tracks,
+            dispatch = dispatch,
+            tint = field,
+            action = { actionInk ->
+                IconTap(
+                    icon = DmtIcons.Search,
+                    description = stringResource(R.string.search_hint),
+                    onClick = {
+                        dispatch(DmtAction.OpenFolder(null))
+                        dispatch(DmtAction.Query(""))
+                    },
+                    ink = actionInk,
+                )
+            },
         )
     }
 }
@@ -196,7 +250,8 @@ internal fun LazyListScope.folderContents(
     if (folder.children.isNotEmpty()) {
         items(folder.children, key = { "folder:${it.path}" }) { child ->
             val title = folderTitle(child)
-            CollectionRow(
+            FolderRow(
+                folder = child,
                 title = title,
                 detail = folderSummary(child),
                 onClick = { dispatch(DmtAction.OpenFolder(child.path)) },

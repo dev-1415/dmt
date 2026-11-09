@@ -1,8 +1,12 @@
 package dev.jyotiraditya.dmt.presentation.library
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,7 +54,15 @@ import dev.jyotiraditya.dmt.ui.theme.Surface
 
 /** The playlist shelf: a button to make one, then every saved playlist. */
 internal fun LazyListScope.playlists(state: DmtState, dispatch: (DmtAction) -> Unit) {
-    item(key = "new") { NewPlaylist(dispatch) }
+    item(key = "actions") {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Margin, vertical = 8.dp),
+        ) {
+            NewPlaylist(dispatch, Modifier.weight(1f))
+            ImportPlaylist(dispatch, Modifier.weight(1f))
+        }
+    }
     if (state.playlists.isEmpty()) {
         item {
             Text(
@@ -67,7 +79,7 @@ internal fun LazyListScope.playlists(state: DmtState, dispatch: (DmtAction) -> U
 }
 
 @Composable
-private fun NewPlaylist(dispatch: (DmtAction) -> Unit) {
+private fun NewPlaylist(dispatch: (DmtAction) -> Unit, modifier: Modifier = Modifier) {
     var creating by remember { mutableStateOf(false) }
     if (creating) {
         CreateSheet(
@@ -81,13 +93,45 @@ private fun NewPlaylist(dispatch: (DmtAction) -> Unit) {
         fill = Ink,
         ink = Surface,
         onClick = { creating = true },
-        modifier = Modifier.padding(horizontal = Margin, vertical = 8.dp),
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ImportPlaylist(dispatch: (DmtAction) -> Unit, modifier: Modifier = Modifier) {
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) dispatch(DmtAction.ImportPlaylist(uri))
+        }
+    Block(
+        label = stringResource(R.string.playlist_import),
+        icon = DmtIcons.Folder,
+        fill = Surface,
+        ink = Ink,
+        onClick = {
+            launcher.launch(
+                arrayOf(
+                    "audio/x-mpegurl",
+                    "audio/mpegurl",
+                    "application/vnd.apple.mpegurl",
+                    "text/plain",
+                    "*/*",
+                ),
+            )
+        },
+        modifier = modifier,
     )
 }
 
 @Composable
 private fun PlaylistLine(playlist: Playlist, dispatch: (DmtAction) -> Unit) {
     var acting by remember { mutableStateOf(false) }
+    val exportLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("audio/x-mpegurl"),
+        ) { uri ->
+            if (uri != null) dispatch(DmtAction.ExportPlaylist(playlist.name, uri))
+        }
     if (acting) {
         ActionSheet(
             title = playlist.name,
@@ -95,6 +139,7 @@ private fun PlaylistLine(playlist: Playlist, dispatch: (DmtAction) -> Unit) {
             dispatch = dispatch,
             onDismiss = { acting = false },
             onDelete = { dispatch(DmtAction.DeletePlaylist(playlist.name)) },
+            onExport = { exportLauncher.launch("${playlist.name}.m3u8") },
         )
     }
     CollectionRow(
@@ -171,6 +216,7 @@ internal fun ActionSheet(
     dispatch: (DmtAction) -> Unit,
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)? = null,
+    onExport: (() -> Unit)? = null,
 ) {
     DmtSheet(onDismiss = onDismiss) {
         val act = { action: DmtAction ->
@@ -205,6 +251,16 @@ internal fun ActionSheet(
                 stringResource(R.string.action_add_to_queue),
                 onClick = {
                     act(DmtAction.Enqueue(tracks, title))
+                },
+            )
+        }
+        if (onExport != null) {
+            SheetAction(
+                DmtIcons.ArrowOut,
+                stringResource(R.string.playlist_export),
+                onClick = {
+                    onExport()
+                    dismiss()
                 },
             )
         }

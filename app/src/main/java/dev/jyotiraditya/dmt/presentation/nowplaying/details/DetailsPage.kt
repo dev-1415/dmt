@@ -9,13 +9,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.state.rememberPlaybackSpeedState
@@ -36,15 +42,28 @@ import dev.jyotiraditya.dmt.util.asTime
 /** The playing track's format, the path its sound takes to the speaker, and its tags. */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun DetailsPage(state: DmtState, player: Player, modifier: Modifier = Modifier) {
+internal fun DetailsPage(
+    state: DmtState,
+    player: Player,
+    onAtTopChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val speed = rememberPlaybackSpeedState(player).playbackSpeed
     val stages =
         remember(state.tech, state.route, speed) { signalChain(state.tech, state.route, speed) }
     val track = state.nowPlayingTrack
     val file =
         remember(stages) { stages.firstOrNull { it.title == R.string.chain_file }?.facts.orEmpty() }
+    val listState = rememberLazyListState()
+    val atTop by rememberUpdatedState(onAtTopChanged)
+    LaunchedEffect(listState) {
+        snapshotFlow { !listState.canScrollBackward }
+            .distinctUntilChanged()
+            .collect { atTop(it) }
+    }
 
     LazyColumn(
+        state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = Margin),
     ) {

@@ -110,6 +110,12 @@
     <string name="playlist_add_tracks_title">Add tracks</string>
     <string name="playlist_pick_title">Add to playlist</string>
     <string name="playlist_pick_empty">No playlists yet. Make one in Library.</string>
+    <string name="playlist_import">Import M3U</string>
+    <string name="playlist_export">Export M3U</string>
+    <string name="notice_playlist_imported">Imported %1$s</string>
+    <string name="notice_playlist_exported">Exported %1$s</string>
+    <string name="error_playlist_import">Could not import that playlist</string>
+    <string name="error_playlist_export">Could not export that playlist</string>
 
     <!-- Track actions -->
     <string name="action_play">Play</string>

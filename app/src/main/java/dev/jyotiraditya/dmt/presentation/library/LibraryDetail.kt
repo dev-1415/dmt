@@ -50,6 +50,7 @@ import dev.jyotiraditya.dmt.ui.motion.sharedElement
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
+import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
 import dev.jyotiraditya.dmt.ui.theme.fitShare
 import dev.jyotiraditya.dmt.ui.theme.inkOn
 import dev.jyotiraditya.dmt.ui.theme.poster
@@ -67,7 +68,7 @@ internal fun DetailHead(
 ) {
     val seed = tracks.firstOrNull()
     val ownField = rememberFieldColor(seed)
-    val field = tint ?: ownField
+    val field = tint ?: ownField.darkenedForPlayer()
     val paint by animateFieldAsState(field)
     val ink = field.inkOn()
 
@@ -127,7 +128,7 @@ internal fun DetailActions(
 ) {
     val seed = tracks.firstOrNull()
     val ownField = rememberFieldColor(seed)
-    val field = tint ?: ownField
+    val field = tint ?: ownField.darkenedForPlayer()
     val paint by animateFieldAsState(field)
     val ink = field.inkOn()
     Row(

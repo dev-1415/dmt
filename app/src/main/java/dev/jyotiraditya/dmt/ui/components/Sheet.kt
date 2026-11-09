@@ -45,6 +45,7 @@ class DmtSheetScope internal constructor(private val close: () -> Unit) {
 fun DmtSheet(
     onDismiss: () -> Unit,
     gesturesEnabled: Boolean = true,
+    showHandle: Boolean = gesturesEnabled,
     content: @Composable DmtSheetScope.() -> Unit,
 ) {
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -64,7 +65,7 @@ fun DmtSheet(
         sheetGesturesEnabled = gesturesEnabled,
         scrimColor = Dark.copy(alpha = 0.6f),
         dragHandle =
-            if (gesturesEnabled) {
+            if (showHandle) {
                 {
                     BottomSheetDefaults.DragHandle(
                         width = 40.dp,

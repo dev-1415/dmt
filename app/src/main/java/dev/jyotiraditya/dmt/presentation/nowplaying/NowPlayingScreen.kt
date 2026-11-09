@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +52,7 @@ internal fun NowPlayingPage(
 ) {
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
+    var detailsAtTop by remember { mutableStateOf(true) }
     val steps = rememberSeekSteps()
     val wide = windowShape().wide
     val paint by animateFieldAsState(field)
@@ -58,11 +60,16 @@ internal fun NowPlayingPage(
     val playerTop = paint.darkenedForPlayerTop()
 
     if (showDetails) {
-        DmtSheet(onDismiss = { showDetails = false }, gesturesEnabled = false) {
+        DmtSheet(
+            onDismiss = { showDetails = false },
+            gesturesEnabled = detailsAtTop,
+            showHandle = true,
+        ) {
             SheetHeader(title = stringResource(R.string.player_tab_details))
             DetailsPage(
                 state = state,
                 player = player,
+                onAtTopChanged = { detailsAtTop = it },
                 modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
             )
         }
@@ -128,7 +135,10 @@ internal fun NowPlayingPage(
                         active = active,
                         onOpenArtist = onOpenArtist,
                         onOpenAlbum = onOpenAlbum,
-                        onOpenDetails = { showDetails = true },
+                        onOpenDetails = {
+                            detailsAtTop = true
+                            showDetails = true
+                        },
                         onToggleLyrics = { showLyrics = !showLyrics },
                     )
                 }
@@ -145,7 +155,10 @@ internal fun NowPlayingPage(
                 active = active,
                 onOpenArtist = onOpenArtist,
                 onOpenAlbum = onOpenAlbum,
-                onOpenDetails = { showDetails = true },
+                onOpenDetails = {
+                    detailsAtTop = true
+                    showDetails = true
+                },
                 onToggleLyrics = { showLyrics = !showLyrics },
             )
         }

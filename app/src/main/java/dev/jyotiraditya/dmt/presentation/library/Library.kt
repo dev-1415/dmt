@@ -74,7 +74,10 @@ private fun LibraryContent(
                 )
             }
 
-        is LibraryScreen.OfFolder -> FolderDetail(screen.folder, state, dispatch, tint)
+        is LibraryScreen.OfFolder ->
+            ScrollMemory("folder:${screen.folder.path}") {
+                FolderDetail(screen.folder, state, dispatch, tint)
+            }
 
         is LibraryScreen.OfPlaylist -> PlaylistDetail(screen.playlist, state, dispatch)
 

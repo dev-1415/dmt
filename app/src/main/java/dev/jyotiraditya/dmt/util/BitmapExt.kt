@@ -105,6 +105,7 @@ suspend fun Bitmap.fieldColor(): Color = withContext(Dispatchers.Default) {
 
     var bestScore = -1f
     var bestColor = 0
+    var bestPopulation = 0f
     for (k in 0 until CLUSTERS) {
         if (counts[k] == 0) continue
         val color =
@@ -125,14 +126,47 @@ suspend fun Bitmap.fieldColor(): Color = withContext(Dispatchers.Default) {
         if (score > bestScore) {
             bestScore = score
             bestColor = color
+            bestPopulation = population
         }
     }
     if (bestScore < 0f) return@withContext neutralField(brightness / pixels.size)
 
     PlatformColor.colorToHSV(bestColor, hsv)
-    hsv[1] = hsv[1].coerceIn(0.38f, 0.62f)
-    hsv[2] = hsv[2].coerceIn(0.38f, 0.58f)
-    Color(PlatformColor.HSVToColor(hsv))
+    presetTint(hsv[0], hsv[1], bestPopulation)
+}
+
+/** Hues that keep the page tint varied but always readable. */
+private val PresetHues =
+    floatArrayOf(
+        0f,
+        340f,
+        320f,
+        300f,
+        280f,
+        260f,
+        240f,
+        220f,
+        200f,
+        185f,
+        170f,
+        155f,
+        140f,
+        120f,
+    )
+
+/** The preset tint nearest [hue], or a neutral when the cover has little colour. */
+private fun presetTint(hue: Float, chroma: Float, population: Float): Color {
+    if (chroma < 0.12f || population < 0.08f) return neutralField(0.5f)
+    val nearest = PresetHues.minBy { angularDistance(hue, it) }
+    // Greens need more saturation so they read as green rather than olive.
+    val saturation = if (nearest in 100f..160f) 0.68f else 0.55f
+    return Color.hsv(nearest, saturation, 0.55f)
+}
+
+/** The shortest distance between two hues, in degrees. */
+private fun angularDistance(a: Float, b: Float): Float {
+    val d = abs(a - b) % 360f
+    return minOf(d, 360f - d)
 }
 
 /** K-means++ seeds: the most colourful pixel, then the pixels furthest from the seeds so far. */

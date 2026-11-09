@@ -55,7 +55,6 @@ import dev.jyotiraditya.dmt.ui.components.ChoiceRow
 import dev.jyotiraditya.dmt.ui.components.DmtIcon
 import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.EmptyState
-import dev.jyotiraditya.dmt.ui.components.IconTap
 import dev.jyotiraditya.dmt.ui.components.PlayingBars
 import dev.jyotiraditya.dmt.ui.components.ScrollBar
 import dev.jyotiraditya.dmt.ui.components.SearchBox
@@ -92,6 +91,8 @@ internal fun QueuePage(
     player: Player?,
     tint: Color,
     dispatch: (DmtAction) -> Unit,
+    scrollToCurrent: Boolean,
+    onScrolledToCurrent: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(QueueSort.QUEUE) }
@@ -147,15 +148,20 @@ internal fun QueuePage(
     val order = remember(filtered) { filtered.toMutableStateList() }
     val displayed = if (reorderable) order else filtered
     val drag = remember { DragState(listState) }
-    var scrollToCurrent by remember { mutableStateOf(false) }
-    val currentPosition = displayed.indexOfFirst { it.index == currentIndex }
     LaunchedEffect(scrollToCurrent, displayed) {
         if (!scrollToCurrent) return@LaunchedEffect
         val position = displayed.indexOfFirst { it.index == currentIndex }
-        if (position < 0) return@LaunchedEffect
+        if (position < 0) {
+            if (query.isNotEmpty()) {
+                query = ""
+            } else {
+                onScrolledToCurrent()
+            }
+            return@LaunchedEffect
+        }
         // The heading is the list's first item.
         listState.animateScrollToItem(position + 1)
-        scrollToCurrent = false
+        onScrolledToCurrent()
     }
     Column(modifier = Modifier.fillMaxSize().background(tint)) {
         Box(modifier = Modifier.weight(1f)) {
@@ -194,16 +200,6 @@ internal fun QueuePage(
                 hint = stringResource(R.string.queue_search_hint),
                 onQuery = { query = it },
                 modifier = Modifier.weight(1f),
-            )
-            IconTap(
-                icon = DmtIcons.Play,
-                description = stringResource(R.string.nav_now_playing),
-                onClick = {
-                    if (currentPosition < 0) query = ""
-                    scrollToCurrent = true
-                },
-                enabled = currentIndex != null,
-                ink = Ink,
             )
         }
     }

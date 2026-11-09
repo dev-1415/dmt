@@ -1,5 +1,6 @@
 package dev.jyotiraditya.dmt.presentation.player
 
+import android.net.Uri
 import dev.jyotiraditya.dmt.core.common.UiText
 import dev.jyotiraditya.dmt.domain.model.Album
 import dev.jyotiraditya.dmt.domain.model.Artist
@@ -146,6 +147,9 @@ sealed interface DmtAction {
 
     data class Show(val view: DmtView) : DmtAction
 
+    /** Returns the folder view to the configured starting folder. */
+    data object ResetFolder : DmtAction
+
     /** Opens the album with this [Album.id], or closes the open one. */
     data class OpenAlbum(val id: String?) : DmtAction
 
@@ -167,6 +171,12 @@ sealed interface DmtAction {
     data class AddToPlaylist(val name: String, val track: Track) : DmtAction
 
     data class RemoveFromPlaylist(val name: String, val path: String) : DmtAction
+
+    /** Imports the M3U/M3U8 file at [uri] as a new playlist. */
+    data class ImportPlaylist(val uri: Uri) : DmtAction
+
+    /** Exports the playlist [name] to the M3U/M3U8 file at [uri]. */
+    data class ExportPlaylist(val name: String, val uri: Uri) : DmtAction
 
     data class PlayAt(val list: List<Track>, val index: Int) : DmtAction
 

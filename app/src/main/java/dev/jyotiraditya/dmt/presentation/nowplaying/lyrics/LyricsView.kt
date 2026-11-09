@@ -14,6 +14,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -64,7 +65,13 @@ internal fun LyricsView(
                 handHeld = false
             }
     }
-    LaunchedEffect(trackId) { listState.scrollToItem(0) }
+    var lastTrackId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(trackId) {
+        if (lastTrackId != trackId) {
+            listState.scrollToItem(0)
+            lastTrackId = trackId
+        }
+    }
     LaunchedEffect(lyrics, listState) {
         snapshotFlow { if (handHeld) -1 else activeIndex }
             .collect { index ->

@@ -7,7 +7,7 @@ import androidx.core.graphics.ColorUtils
 
 // A dark-only palette; surfaces are told apart by tone, never by borders or shadows.
 
-val Ground = Color(0xFF111111)
+val Ground = Color(0xFF000000)
 
 /** A raised surface: fields and selected rows. */
 val Surface = Color(0xFF1C1C1C)

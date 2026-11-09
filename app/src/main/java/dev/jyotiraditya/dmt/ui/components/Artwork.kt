@@ -153,4 +153,13 @@ fun fallbackField(seed: Long): Color =
     FallbackFields[seed.mod(FallbackFields.size.toLong()).toInt()]
 
 private val FallbackFields =
-    listOf(Color(0xFF2E4A3A), Color(0xFF3A3350), Color(0xFF4A3330), Color(0xFF2E3C4A))
+    listOf(
+        Color(0xFF2E4A3A),
+        Color(0xFF3A3350),
+        Color(0xFF4A3340),
+        Color(0xFF2E3C4A),
+        Color(0xFF2E4A4A),
+        Color(0xFF3A2E4A),
+        Color(0xFF4A3348),
+        Color(0xFF2E3A4A),
+    )

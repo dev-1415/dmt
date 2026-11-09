@@ -125,7 +125,7 @@ internal fun CurrentLyricLine(
         }
     Box(
         contentAlignment = Alignment.CenterStart,
-        modifier = modifier.height(56.dp).then(tap),
+        modifier = modifier.height(48.dp).then(tap),
     ) {
         if (lyrics != null) {
             val bySinger = state.settings.singerColors
