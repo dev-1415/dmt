@@ -44,4 +44,39 @@ class LyricsLrcTest {
         val lyrics = Lyrics(listOf(line), synced = true)
         assertEquals("[00:01.00]<00:01.00>Hello <00:01.50>world", lyrics.toLrc())
     }
+
+    @Test
+    fun `translations and transliteration survive a round trip`() {
+        val line =
+            LyricLine(
+                startMs = 1_000,
+                endMs = 2_000,
+                text = "こんにちは",
+                words = listOf(LyricWord(1_000, 2_000, 0, 5, background = false)),
+                transliteration =
+                    TimedText(
+                        "Konnichiwa",
+                        listOf(LyricWord(1_000, 2_000, 0, 10, background = false)),
+                    ),
+                translation =
+                    listOf(
+                        TimedText(
+                            "Hello",
+                            listOf(LyricWord(1_000, 2_000, 0, 5, background = false)),
+                        ),
+                    ),
+            )
+        val lrc = Lyrics(listOf(line), synced = true).toLrc()
+        assertEquals(
+            "[00:01.00]<00:01.00>こんにちは\n" +
+                "[bg: [00:01.00]<00:01.00>Konnichiwa]\n" +
+                "[tr: [00:01.00]<00:01.00>Hello]",
+            lrc,
+        )
+
+        val parsed = LyricsParser.parse(lrc)!!
+        val parsedLine = parsed.lines.single()
+        assertEquals("Konnichiwa", parsedLine.transliteration?.text)
+        assertEquals("Hello", parsedLine.translation.single().text)
+    }
 }

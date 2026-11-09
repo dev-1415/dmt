@@ -6,6 +6,10 @@
 -keep class org.jaudiotagger.** { *; }
 -dontwarn org.jaudiotagger.**
 
+# Jaudiotagger's MP4 reader reflects into jcodec's box classes by name.
+-keep class org.jcodec.** { *; }
+-dontwarn org.jcodec.**
+
 # Loaded via reflection (Class.forName / ServiceLoader), not referenced directly.
 -keep class androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer { <init>(...); }
 -keep class androidx.media3.decoder.midi.MidiRenderer { <init>(...); }

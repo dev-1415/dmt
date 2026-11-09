@@ -39,6 +39,11 @@ class LyricsRepository @Inject constructor(@param:ApplicationContext private val
         }
     }
 
+    /** Drops the cached lyrics for [path], after the file's tags were rewritten. */
+    fun invalidate(path: String) {
+        LyricsSource.entries.forEach { source -> cache.remove("$source:$path") }
+    }
+
     /** The lyrics kept under [key] while [files] stay unchanged, or else those [read] returns. */
     private inline fun cached(key: String, files: List<File>, read: () -> Lyrics?): Lyrics? {
         val stamp = files.map { it.lastModified() to it.length() }

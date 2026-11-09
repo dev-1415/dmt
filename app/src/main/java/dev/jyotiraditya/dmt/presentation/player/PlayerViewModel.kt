@@ -74,7 +74,7 @@ constructor(
     private val preferencesRepository: PreferencesRepository,
     private val scanLibrary: ScanLibraryUseCase,
     private val connectSource: ConnectSourceUseCase,
-    getLyrics: GetLyricsUseCase,
+    private val getLyrics: GetLyricsUseCase,
     getTrackTech: GetTrackTechUseCase,
     private val trackMediaRepository: TrackMediaRepository,
     animatedArtworkRepository: AnimatedArtworkRepository,
@@ -505,11 +505,17 @@ constructor(
             delay(500)
             LyricsEmbedder.embed(context, track, lyrics.toLrc()).fold(
                 onSuccess = {
+                    // The file may keep its old size and modified date, so drop the cached lyrics.
+                    getLyrics.invalidateLocal(track.path)
                     notify(UiText(R.string.notice_lyrics_embedded))
                     // Re-read the file's tags so the library shows the same title and artist.
                     scan(refresh = true)
                 },
-                onFailure = { reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) } },
+                onFailure = {
+                    reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
+                    // A failed write may still have changed MediaStore, so read the tags again.
+                    scan(refresh = true)
+                },
             )
             c.setMediaItems(items, index, position)
             c.prepare()

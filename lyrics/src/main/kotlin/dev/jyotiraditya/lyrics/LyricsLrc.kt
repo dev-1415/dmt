@@ -6,23 +6,47 @@ import java.util.Locale
 fun Lyrics.toLrc(): String {
     if (!synced) return lines.joinToString("\n") { it.text }
     return lines.joinToString("\n") { line ->
-        val stamp = "[${line.startMs.lrcTime()}]"
-        if (line.words.isEmpty()) {
-            stamp + line.text
-        } else {
-            buildString {
-                append(stamp)
-                var cursor = 0
-                line.words.forEach { word ->
-                    if (word.start > cursor) append(line.text, cursor, word.start)
-                    append('<').append(word.startMs.lrcTime()).append('>')
-                    append(line.text, word.start, word.end)
-                    cursor = word.end
-                }
-                if (cursor < line.text.length) append(line.text, cursor, line.text.length)
-            }
+        buildString {
+            append(line.lrcLine())
+            line.transliteration?.let { appendSecondary("bg", line.startMs, it) }
+            line.translation.forEach { appendSecondary("tr", line.startMs, it) }
         }
     }
+}
+
+private fun LyricLine.lrcLine(): String {
+    val stamp = "[${startMs.lrcTime()}]"
+    if (words.isEmpty()) return stamp + text
+    return buildString {
+        append(stamp)
+        var cursor = 0
+        words.forEach { word ->
+            if (word.start > cursor) append(text, cursor, word.start)
+            append('<').append(word.startMs.lrcTime()).append('>')
+            append(text, word.start, word.end)
+            cursor = word.end
+        }
+        if (cursor < text.length) append(text, cursor, text.length)
+    }
+}
+
+/** Appends a `[bg: ...]` transliteration or `[tr: ...]` translation line. */
+private fun StringBuilder.appendSecondary(marker: String, lineStartMs: Long, text: TimedText) {
+    append('\n')
+    append('[').append(marker).append(": [").append(lineStartMs.lrcTime()).append(']')
+    if (text.words.isEmpty()) {
+        append(text.text)
+    } else {
+        var cursor = 0
+        text.words.forEach { word ->
+            if (word.start > cursor) append(text.text, cursor, word.start)
+            append('<').append(word.startMs.lrcTime()).append('>')
+            append(text.text, word.start, word.end)
+            cursor = word.end
+        }
+        if (cursor < text.text.length) append(text.text, cursor, text.text.length)
+    }
+    append(']')
 }
 
 private fun Long.lrcTime(): String {

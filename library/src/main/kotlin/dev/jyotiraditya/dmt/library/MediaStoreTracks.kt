@@ -7,8 +7,16 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.net.toUri
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 private const val TRACKS_PER_DISC = 1000
+
+/** Files read at once; more does not read faster. */
+private const val MAX_PARALLEL_READS = 8
 
 private val ALBUM_ART_BASE: Uri = "content://media/external/audio/albumart".toUri()
 
@@ -39,23 +47,90 @@ private val TAG_COLUMNS =
 
 object MediaStoreTracks {
 
-    fun query(context: Context): List<LibraryTrack> = context.contentResolver
-        .query(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            columns(),
-            // A null music flag marks files the scanner could not read, which may still play.
-            "${MediaStore.Audio.Media.IS_MUSIC} != 0" +
-                " OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL",
-            null,
-            null,
-        )
-        ?.use { cursor ->
-            val row = Row(cursor)
-            ArrayList<LibraryTrack>(cursor.count).apply {
-                while (cursor.moveToNext()) add(row.read())
+    suspend fun query(
+        context: Context,
+        known: Map<String, LibraryTrack> = emptyMap(),
+    ): List<LibraryTrack> = coroutineScope {
+        val rows =
+            context.contentResolver
+                .query(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    columns(),
+                    // A null music flag marks files the scanner could not read, which may still play.
+                    "${MediaStore.Audio.Media.IS_MUSIC} != 0" +
+                        " OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL",
+                    null,
+                    null,
+                )
+                ?.use { cursor ->
+                    val row = Row(cursor)
+                    ArrayList<LibraryTrack>(cursor.count).apply {
+                        while (cursor.moveToNext()) add(row.read())
+                    }
+                }
+                .orEmpty()
+
+        // The scanner can lose a file's tags when the file is replaced. Read them from the file
+        // itself for rows that came back without a title, artist or album.
+        val inFlight = Semaphore(MAX_PARALLEL_READS)
+        val result = rows.toMutableList()
+        val reads = ArrayList<Pair<Int, Deferred<LibraryTrack>>>(rows.size)
+        rows.forEachIndexed { index, track ->
+            val missing =
+                track.title == UNKNOWN_TITLE ||
+                    track.artist == UNKNOWN_ARTIST ||
+                    track.album == UNKNOWN_ALBUM
+            if (!missing) return@forEachIndexed
+
+            // Reuse the last read while the file is unchanged, so an untagged file is not
+            // parsed again on every scan.
+            val held = known[track.path]?.takeIf { it.matches(track) && it.hasMetadata() }
+            if (held != null) {
+                result[index] =
+                    track.copy(
+                        title = held.title,
+                        artist = held.artist,
+                        albumArtist = held.albumArtist,
+                        album = held.album,
+                        durationMs = held.durationMs,
+                        trackNumber = held.trackNumber,
+                        discNumber = held.discNumber,
+                        genre = held.genre,
+                    )
+            } else {
+                reads +=
+                    index to
+                        async { inFlight.withPermit { track.withFileMetadata(context) } }
             }
         }
-        .orEmpty()
+        reads.forEach { (index, deferred) -> result[index] = deferred.await() }
+        result
+    }
+
+    /** Whether [other] describes the same unchanged file. */
+    private fun LibraryTrack.matches(other: LibraryTrack): Boolean =
+        size == other.size && dateModified == other.dateModified
+
+    /** Whether this track has any tag worth reusing. */
+    private fun LibraryTrack.hasMetadata(): Boolean =
+        title != UNKNOWN_TITLE || artist != UNKNOWN_ARTIST || album != UNKNOWN_ALBUM
+
+    private suspend fun LibraryTrack.withFileMetadata(context: Context): LibraryTrack {
+        val metadata = MetadataReader.read(context, uri)
+        val fileTitle = metadata.title?.takeIf { it.isNotBlank() }
+        val fileArtist = metadata.artist?.takeIf { it.isNotBlank() }
+        val fileAlbum = metadata.album?.takeIf { it.isNotBlank() }
+        if (fileTitle == null && fileArtist == null && fileAlbum == null) return this
+        return copy(
+            title = fileTitle ?: title,
+            artist = fileArtist ?: artist,
+            album = fileAlbum ?: album,
+            durationMs = metadata.durationMs.takeIf { it > 0 } ?: durationMs,
+            trackNumber = metadata.trackNumber.takeIf { it > 0 } ?: trackNumber,
+            discNumber = metadata.discNumber.takeIf { it > 0 } ?: discNumber,
+            genre = metadata.genre?.takeIf { it.isNotBlank() } ?: genre,
+        )
+    }
 
     private fun columns(): Array<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) COLUMNS + TAG_COLUMNS else COLUMNS

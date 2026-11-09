@@ -69,6 +69,11 @@ constructor(
             fetched.getOrNull().also { if (fetched.isSuccess) server.put(track.id, Answer(it)) }
         }
 
+    /** Drops the cached local lyrics for [path], after the file's tags were rewritten. */
+    fun invalidateLocal(path: String) {
+        lyricsRepository.invalidate(path)
+    }
+
     /** How each source with lyrics for [track] is timed, without asking the network. */
     suspend fun availableSources(track: Track): Map<LyricsSource, LyricsTiming> =
         withContext(Dispatchers.IO) {

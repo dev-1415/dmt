@@ -1,21 +1,34 @@
 package dev.jyotiraditya.dmt.data.lyrics
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
+import dev.jyotiraditya.dmt.BuildConfig
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.model.TrackSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.jaudiotagger.audio.AudioFile
 import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.audio.mp3.MP3FileWriter
+import org.jaudiotagger.audio.mp4.Mp4FileWriter
+import org.jaudiotagger.audio.ogg.OggFileWriter
+import org.jaudiotagger.audio.opus.OpusFileWriter
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.Tag
 import java.io.File
+import java.io.RandomAccessFile
 import kotlin.coroutines.resume
+
+private const val TAG = "LyricsEmbedder"
 
 /** Writes lyrics into a local track's tags, replacing any lyrics already embedded. */
 object LyricsEmbedder {
@@ -26,49 +39,211 @@ object LyricsEmbedder {
                 require(track.source == TrackSource.LOCAL) { "Only local tracks can be edited" }
                 val file = File(track.path)
                 require(file.isFile) { "The track file is missing" }
+                // Remove backups left behind by an older version of the embedder.
+                file.parentFile
+                    ?.listFiles { candidate -> candidate.name.endsWith(".dmt-backup") }
+                    ?.forEach { it.delete() }
                 // The extension can lie, so the container is read from the file's own header.
                 val format = audioFormat(file, track)
+                if (format == null) {
+                    EmbedLog.write(
+                        context,
+                        "embed failed: unsupported format for ${file.absolutePath} " +
+                            "mime=${track.mime} header=${headerHex(file)}",
+                        folder = file.parentFile,
+                    )
+                }
                 require(format != null) { "This file format cannot hold lyrics" }
                 val modified = file.lastModified()
-                val backup = File(file.parentFile, "${file.name}.dmt-backup")
-                file.copyTo(backup, overwrite = true)
-                if (modified > 0L) backup.setLastModified(modified)
+                EmbedLog.write(
+                    context,
+                    "embed ${file.absolutePath} format=$format size=${file.length()} " +
+                        "header=${headerHex(file)}",
+                    folder = file.parentFile,
+                )
+                // The source copy is the recovery copy and is never written to.
+                val source = File(file.parentFile, ".dmt-source-${System.nanoTime()}.$format")
+                // The destination is the rewritten file that replaces the original.
+                val destination = File(file.parentFile, ".dmt-dest-${System.nanoTime()}.$format")
+                var sourceReady = false
+                var originalDeleted = false
                 try {
-                    val tag =
-                        if (format == "opus") {
-                            OpusTags.write(file, lyrics)
-                            null
-                        } else {
-                            val audio = AudioFileIO.readAs(file, format)
-                            val tag = audio.tagOrCreateAndSetDefault
-                            tag.setField(FieldKey.LYRICS, lyrics)
-                            // Keep the comment header small enough for MediaStore and Media3 to read it.
-                            if (tag.hasField("UNSYNCEDLYRICS")) tag.deleteField("UNSYNCEDLYRICS")
-                            AudioFileIO.write(audio)
-                            require(headerMatches(file, format)) {
-                                "The rewritten file is not readable"
-                            }
-                            tag
+                    file.copyTo(source, overwrite = true)
+                    if (modified > 0L) source.setLastModified(modified)
+                    sourceReady = true
+                    val tag = writeLyrics(context, source, destination, format, lyrics)
+                    require(destination.isFile && headerMatches(destination, format)) {
+                        "The rewritten file is not readable"
+                    }
+                    // Replace the original only after the new file has been verified. A rename
+                    // over the original is atomic; deleting first is only the fallback.
+                    if (!destination.renameTo(file)) {
+                        originalDeleted = deleteWithRetry(file)
+                        require(originalDeleted) { "Could not replace the file" }
+                        require(renameWithRetry(destination, file)) {
+                            "Could not replace the file"
                         }
-                    // Keep the file where it was in date-modified order.
-                    if (modified > 0L) file.setLastModified(modified)
-                    backup.delete()
-                    // The Opus tags are preserved, so a MediaStore rescan can only lose them.
-                    if (format != "opus") {
-                        runCatching { scanAndRefresh(context, file, track, tag) }
+                    }
+                    runCatching { if (modified > 0L) file.setLastModified(modified) }
+                    source.delete()
+                    // The scan may lose tags for some formats, so the refresh puts them back.
+                    runCatching { scanAndRefresh(context, file, track, tag, modified) }
+                    if (BuildConfig.DEBUG) {
+                        val reread = runCatching { AudioFileIO.readAs(file, format).tag }.getOrNull()
+                        EmbedLog.write(
+                            context,
+                            "embedded ${file.name} format=$format " +
+                                "title=${reread?.getFirst(FieldKey.TITLE)} " +
+                                "artist=${reread?.getFirst(FieldKey.ARTIST)} " +
+                                "album=${reread?.getFirst(FieldKey.ALBUM)} " +
+                                "lyrics=${reread?.getFirst(FieldKey.LYRICS)?.length} " +
+                                "artwork=${reread?.getFirstArtwork() != null}",
+                            folder = file.parentFile,
+                        )
                     }
                     Unit
                 } catch (failure: Throwable) {
-                    // Put the original back when the writer damaged the file.
+                    Log.e(TAG, "embed failed for ${file.name} format=$format", failure)
+                    EmbedLog.write(
+                        context,
+                        "embed failed for ${file.name} format=$format",
+                        failure,
+                        folder = file.parentFile,
+                    )
+                    destination.delete()
+                    // Put the original back if it was already removed. Keep the source copy if
+                    // the restore fails, so the file can still be recovered by hand.
+                    var restored = !originalDeleted
+                    if (sourceReady && originalDeleted) {
+                        restored =
+                            runCatching {
+                                source.copyTo(file, overwrite = true)
+                                if (modified > 0L) file.setLastModified(modified)
+                            }.isSuccess
+                    }
+                    if (restored) source.delete()
+                    // Make MediaStore show the original tags again after a failed write.
                     runCatching {
-                        backup.copyTo(file, overwrite = true)
-                        if (modified > 0L) file.setLastModified(modified)
-                        backup.delete()
+                        val restoredTag =
+                            runCatching { AudioFileIO.readAs(file, format).tag }.getOrNull()
+                        scanAndRefresh(context, file, track, restoredTag, modified)
                     }
                     throw failure
                 }
             }
         }
+
+    /** Reads [source], writes the lyrics, and returns the tag that was written. */
+    private fun writeLyrics(
+        context: Context,
+        source: File,
+        destination: File,
+        format: String,
+        lyrics: String,
+    ): Tag {
+        // These writers edit the file in place, so they work on the destination copy.
+        val inPlace =
+            format == "mp3" ||
+                format == "flac" ||
+                format == "wav" ||
+                format == "aiff" ||
+                format == "wma"
+        val readFile =
+            if (inPlace) {
+                source.copyTo(destination, overwrite = true)
+                destination
+            } else {
+                source
+            }
+        val audio = AudioFileIO.readAs(readFile, format)
+        val tag = audio.tagOrCreateAndSetDefault
+        EmbedLog.write(
+            context,
+            "before title=${tag.getFirst(FieldKey.TITLE)} " +
+                "artist=${tag.getFirst(FieldKey.ARTIST)} " +
+                "album=${tag.getFirst(FieldKey.ALBUM)} " +
+                "lyrics=${tag.getFirst(FieldKey.LYRICS).length} " +
+                "artwork=${tag.getFirstArtwork() != null}",
+            folder = source.parentFile,
+        )
+        // Replace every existing lyrics frame, then add the new one.
+        tag.deleteField(FieldKey.LYRICS)
+        tag.setField(tag.createField(FieldKey.LYRICS, lyrics))
+        // Keep the comment header small enough for MediaStore and Media3 to read it.
+        if (tag.hasField("UNSYNCEDLYRICS")) tag.deleteField("UNSYNCEDLYRICS")
+        when {
+            format == "mp3" -> MP3FileWriter().writeFile(audio)
+            inPlace -> AudioFileIO.write(audio)
+            else ->
+                RandomAccessFile(source, "r").use { input ->
+                    RandomAccessFile(destination, "rw").use { output ->
+                        when (format) {
+                            "m4a" -> Mp4Writer().writeTagTo(audio, tag, input, output)
+                            "opus" -> OpusWriter().writeTagTo(audio, tag, input, output)
+                            "ogg" -> OggWriter().writeTagTo(audio, tag, input, output)
+                            else -> error("Unsupported format $format")
+                        }
+                    }
+                }
+        }
+        return tag
+    }
+
+    private class Mp4Writer : Mp4FileWriter() {
+        fun writeTagTo(
+            audio: AudioFile,
+            tag: Tag,
+            source: RandomAccessFile,
+            destination: RandomAccessFile,
+        ) {
+            writeTag(audio, tag, source, destination)
+        }
+    }
+
+    private class OpusWriter : OpusFileWriter() {
+        fun writeTagTo(
+            audio: AudioFile,
+            tag: Tag,
+            source: RandomAccessFile,
+            destination: RandomAccessFile,
+        ) {
+            writeTag(audio, tag, source, destination)
+        }
+    }
+
+    private class OggWriter : OggFileWriter() {
+        fun writeTagTo(
+            audio: AudioFile,
+            tag: Tag,
+            source: RandomAccessFile,
+            destination: RandomAccessFile,
+        ) {
+            writeTag(audio, tag, source, destination)
+        }
+    }
+
+    private suspend fun deleteWithRetry(file: File): Boolean {
+        repeat(10) {
+            if (file.delete()) return true
+            if (!file.exists()) return true
+            delay(100)
+        }
+        return !file.exists()
+    }
+
+    private suspend fun renameWithRetry(source: File, target: File): Boolean {
+        repeat(10) {
+            if (source.renameTo(target)) return true
+            delay(100)
+        }
+        return false
+    }
+
+    private fun headerHex(file: File): String {
+        val bytes = ByteArray(16)
+        val read = file.inputStream().use { it.read(bytes) }
+        return bytes.take(read).joinToString(" ") { "%02X".format(it) }
+    }
 
     /** The container extension jaudiotagger should use, read from the file header first. */
     private fun audioFormat(file: File, track: Track): String? {
@@ -145,7 +320,31 @@ object LyricsEmbedder {
      * Lets MediaStore scan the rewritten file, then puts the file's own tags back. The scan sets
      * the modified date from the restored file time; the update fixes a scan that lost the tags.
      */
-    private suspend fun scanAndRefresh(context: Context, file: File, track: Track, tag: Tag?) {
+    private suspend fun scanAndRefresh(
+        context: Context,
+        file: File,
+        track: Track,
+        tag: Tag?,
+        modified: Long,
+    ) {
+        // Prefer updating the existing row. A scan can give the file a new id, which would
+        // break the queue's media id and the lyrics lookup.
+        val existing = mediaStoreUri(context, file)
+        if (existing != null) {
+            refreshMediaStore(context, existing, track, tag, modified)
+            return
+        }
+        // Replacing the file can remove its row. Ask the media store to index it again.
+        val scannedUri = scanFile(context, file)
+        EmbedLog.write(
+            context,
+            "scan_file ${file.name} -> $scannedUri",
+            folder = file.parentFile,
+        )
+        if (scannedUri != null) {
+            refreshMediaStore(context, scannedUri, track, tag, modified)
+            return
+        }
         val scanned =
             withTimeoutOrNull(5_000) {
                 suspendCancellableCoroutine { continuation ->
@@ -154,25 +353,138 @@ object LyricsEmbedder {
                         arrayOf(file.absolutePath),
                         null,
                     ) { _, uri ->
-                        refreshMediaStore(context, uri ?: track.uri, track, tag)
+                        refreshMediaStore(
+                            context,
+                            uri ?: mediaStoreUri(context, file) ?: track.uri,
+                            track,
+                            tag,
+                            modified,
+                        )
                         if (continuation.isActive) continuation.resume(Unit)
                     }
                 }
             }
-        if (scanned == null) refreshMediaStore(context, track.uri, track, tag)
+        if (scanned == null) {
+            val inserted = insertMediaStore(context, file, track, tag, modified)
+            EmbedLog.write(
+                context,
+                "insert ${file.name} -> $inserted",
+                folder = file.parentFile,
+            )
+            refreshMediaStore(
+                context,
+                inserted ?: mediaStoreUri(context, file) ?: track.uri,
+                track,
+                tag,
+                modified,
+            )
+        }
     }
 
+    /** Inserts a new media store row for [file] when a scan could not create one. */
+    private fun insertMediaStore(
+        context: Context,
+        file: File,
+        track: Track,
+        tag: Tag?,
+        modified: Long,
+    ): Uri? {
+        val title = tag?.text(FieldKey.TITLE, track.title) ?: track.title
+        val artist = tag?.text(FieldKey.ARTIST, track.artist) ?: track.artist
+        val album = tag?.text(FieldKey.ALBUM, track.album) ?: track.album
+        val albumArtist = tag?.text(FieldKey.ALBUM_ARTIST, track.albumArtist) ?: track.albumArtist
+        val trackNumber = tag?.number(FieldKey.TRACK, track.trackNumber) ?: track.trackNumber
+        val discNumber = tag?.number(FieldKey.DISC_NO, track.discNumber) ?: track.discNumber
+        val genre =
+            tag?.text(FieldKey.GENRE, track.genre.orEmpty())?.takeIf { it.isNotBlank() }
+                ?: track.genre?.takeIf { it.isNotBlank() }
+        val values =
+            ContentValues().apply {
+                put(MediaStore.Audio.Media.DATA, file.absolutePath)
+                put(MediaStore.Audio.Media.DISPLAY_NAME, file.name)
+                put(MediaStore.Audio.Media.TITLE, title)
+                put(MediaStore.Audio.Media.ARTIST, artist)
+                put(MediaStore.Audio.Media.ALBUM, album)
+                put(MediaStore.Audio.Media.ALBUM_ARTIST, albumArtist)
+                put(MediaStore.Audio.Media.TRACK, discNumber * 1000 + trackNumber)
+                genre?.let { put(MediaStore.Audio.Media.GENRE, it) }
+                put(MediaStore.Audio.Media.MIME_TYPE, track.mime)
+                put(MediaStore.Audio.Media.SIZE, file.length())
+                put(MediaStore.Audio.Media.DURATION, track.durationMs)
+                put(MediaStore.Audio.Media.BITRATE, track.bitrate)
+                put(MediaStore.Audio.Media.IS_MUSIC, 1)
+                put(MediaStore.Audio.Media.DATE_MODIFIED, (modified / 1000).toInt())
+                put(
+                    MediaStore.Audio.Media.DATE_ADDED,
+                    (track.dateAdded.takeIf { it > 0 } ?: (modified / 1000)).toInt(),
+                )
+            }
+        return runCatching {
+            context.contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+        }.getOrNull()
+    }
+
+    /** Asks the media provider to index [file] again, returning its new row if it did. */
+    @Suppress("DEPRECATION")
+    private fun scanFile(context: Context, file: File): Uri? {
+        val result =
+            runCatching {
+                context.contentResolver.call(
+                    MediaStore.AUTHORITY_URI,
+                    "scan_file",
+                    file.absolutePath,
+                    null,
+                )
+            }.getOrNull() ?: return null
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            result.getParcelable("android.intent.extra.STREAM", Uri::class.java)
+        } else {
+            result.getParcelable("android.intent.extra.STREAM")
+        }
+    }
+
+    /** The media store row for [file], which may have a new id after the file was replaced. */
+    private fun mediaStoreUri(context: Context, file: File): Uri? =
+        context.contentResolver
+            .query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                arrayOf(MediaStore.Audio.Media._ID),
+                "${MediaStore.Audio.Media.DATA} = ?",
+                arrayOf(file.absolutePath),
+                null,
+            )
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    ContentUris.withAppendedId(
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        cursor.getLong(0),
+                    )
+                } else {
+                    null
+                }
+            }
+
     /** Puts the file's own tags back into MediaStore, which may have re-read the file badly. */
-    private fun refreshMediaStore(context: Context, uri: Uri, track: Track, tag: Tag?) {
-        if (tag == null || uri.scheme != "content") return
+    private fun refreshMediaStore(
+        context: Context,
+        uri: Uri,
+        track: Track,
+        tag: Tag?,
+        modified: Long,
+    ) {
+        if (uri.scheme != "content") return
+        val title = tag?.text(FieldKey.TITLE, track.title) ?: track.title
+        val artist = tag?.text(FieldKey.ARTIST, track.artist) ?: track.artist
+        val album = tag?.text(FieldKey.ALBUM, track.album) ?: track.album
+        val albumArtist = tag?.text(FieldKey.ALBUM_ARTIST, track.albumArtist) ?: track.albumArtist
+        val trackNumber = tag?.number(FieldKey.TRACK, track.trackNumber) ?: track.trackNumber
+        val discNumber = tag?.number(FieldKey.DISC_NO, track.discNumber) ?: track.discNumber
+        val genre =
+            tag?.text(FieldKey.GENRE, track.genre.orEmpty())?.takeIf { it.isNotBlank() }
+                ?: track.genre?.takeIf { it.isNotBlank() }
+
+        // Keep the core tags in one update, so an optional column cannot block them.
         runCatching {
-            val title = tag.text(FieldKey.TITLE, track.title)
-            val artist = tag.text(FieldKey.ARTIST, track.artist)
-            val album = tag.text(FieldKey.ALBUM, track.album)
-            val albumArtist = tag.text(FieldKey.ALBUM_ARTIST, track.albumArtist)
-            val trackNumber = tag.number(FieldKey.TRACK, track.trackNumber)
-            val discNumber = tag.number(FieldKey.DISC_NO, track.discNumber)
-            val genre = tag.text(FieldKey.GENRE, track.genre.orEmpty()).takeIf(String::isNotBlank)
             val values =
                 ContentValues().apply {
                     put(MediaStore.Audio.Media.TITLE, title)
@@ -180,9 +492,38 @@ object LyricsEmbedder {
                     put(MediaStore.Audio.Media.ALBUM, album)
                     put(MediaStore.Audio.Media.ALBUM_ARTIST, albumArtist)
                     put(MediaStore.Audio.Media.TRACK, discNumber * 1000 + trackNumber)
-                    genre?.let { put(MediaStore.Audio.Media.GENRE, it) }
                 }
             context.contentResolver.update(uri, values, null, null)
+        }
+        genre?.let { value ->
+            runCatching {
+                context.contentResolver.update(
+                    uri,
+                    ContentValues().apply { put(MediaStore.Audio.Media.GENRE, value) },
+                    null,
+                    null,
+                )
+            }
+        }
+        runCatching {
+            context.contentResolver.update(
+                uri,
+                ContentValues().apply { put(MediaStore.Audio.Media.IS_MUSIC, 1) },
+                null,
+                null,
+            )
+        }
+        if (modified > 0L) {
+            runCatching {
+                context.contentResolver.update(
+                    uri,
+                    ContentValues().apply {
+                        put(MediaStore.Audio.Media.DATE_MODIFIED, modified / 1000)
+                    },
+                    null,
+                    null,
+                )
+            }
         }
     }
 

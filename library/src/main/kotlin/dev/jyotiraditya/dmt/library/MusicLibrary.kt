@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * The tracks on the device, stored between launches and read again only when the media store
@@ -58,17 +59,25 @@ class MusicLibrary(private val context: Context, private val storedGeneration: G
 
             val storedByPath = stored.associateBy { it.path }
             val scannedPaths = scanned.mapTo(HashSet()) { it.path }
+            // A scan can miss a file while it is being replaced. Only drop a stored track when
+            // its file is really gone, so a transient miss cannot make it disappear.
+            val kept = stored.filter { it.path !in scannedPaths && File(it.path).isFile }
+            val removed =
+                stored.map { it.path }.filter { path ->
+                    path !in scannedPaths && !File(path).isFile
+                }
             dao.apply(
                 changed = scanned.filter { storedByPath[it.path] != it }.map { it.toEntity() },
-                removed = stored.map { it.path }.filter { it !in scannedPaths },
+                removed = removed,
             )
             storedGeneration.set(generation)
-            scanned.visible(hidden)
+            (scanned + kept).visible(hidden)
         }
 
     private suspend fun readDevice(known: List<LibraryTrack>): List<LibraryTrack> = coroutineScope {
-        val indexed = async { MediaStoreTracks.query(context) }
-        val unindexed = async { UnindexedTracks.query(context, known.associateBy { it.path }) }
+        val byPath = known.associateBy { it.path }
+        val indexed = async { MediaStoreTracks.query(context, byPath) }
+        val unindexed = async { UnindexedTracks.query(context, byPath) }
         indexed.await() + unindexed.await()
     }
 

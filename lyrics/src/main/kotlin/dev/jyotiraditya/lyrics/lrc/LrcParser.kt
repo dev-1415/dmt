@@ -16,7 +16,8 @@ import kotlin.math.abs
 
 /**
  * Parses line-timed and enhanced LRC. `vN:` marks the singer of a line, `[bg: ...]` a backing
- * vocal, and lines starting together become one line with its transliteration and translations.
+ * vocal or transliteration, `[tr: ...]` a translation, and lines starting together become one line
+ * with its transliteration and translations.
  */
 object LrcParser {
 
@@ -46,6 +47,8 @@ object LrcParser {
 
 private val BACKGROUND_LINE = Regex("""^\[bg:(.*)]$""", RegexOption.IGNORE_CASE)
 
+private val TRANSLATION_LINE = Regex("""^\[tr:(.*)]$""", RegexOption.IGNORE_CASE)
+
 private val VOICE_PREFIX = Regex("""^v(\d+):""")
 
 private class LrcLineReader {
@@ -55,9 +58,15 @@ private class LrcLineReader {
     private val singers = HashMap<Int, Int>()
 
     fun read(source: String) {
-        val background = BACKGROUND_LINE.matchEntire(source.trim())
+        val trimmed = source.trim()
+        val background = BACKGROUND_LINE.matchEntire(trimmed)
         if (background != null) {
             readBackground(background.groupValues[1])
+            return
+        }
+        val translation = TRANSLATION_LINE.matchEntire(trimmed)
+        if (translation != null) {
+            readTranslation(translation.groupValues[1])
             return
         }
 
@@ -92,13 +101,14 @@ private class LrcLineReader {
         val stamp = trimmed.timeTagAt(0, TagStyle.SQUARE)
         val (body, _) = trimmed.substring(stamp?.end ?: 0).withoutVoice()
         val timed = readWordTimes(body)
-        if (timed.text.isBlank() || timed.words.isEmpty()) return
+        if (timed.text.isBlank()) return
 
         val previous = lines.lastOrNull()
         if (stamp != null && previous != null && isReadingOf(previous.text, timed.text)) {
             lines[lines.lastIndex] = previous.copy(transliteration = timed)
             return
         }
+        if (timed.words.isEmpty()) return
         val words = timed.words.map { it.copy(background = true) }
         lines +=
             LyricLine(
@@ -108,6 +118,26 @@ private class LrcLineReader {
                 words = words,
                 singer = previous?.singer ?: 0,
             )
+    }
+
+    /** Reads the translation of the line before it, or of the line with the same start time. */
+    private fun readTranslation(content: String) {
+        val trimmed = content.trim()
+        val stamp = trimmed.timeTagAt(0, TagStyle.SQUARE)
+        val (body, _) = trimmed.substring(stamp?.end ?: 0).withoutVoice()
+        val timed = readWordTimes(body)
+        if (timed.text.isBlank()) return
+
+        val index =
+            if (stamp != null) {
+                lines.indexOfLast { it.startMs == stamp.ms }
+            } else {
+                lines.lastIndex
+            }
+        if (index < 0) return
+        val line = lines[index]
+        lines[index] =
+            line.copy(translation = line.translation + TimedText(timed.text, timed.words))
     }
 
     private fun String.withoutVoice(): Pair<String, Int?> {
