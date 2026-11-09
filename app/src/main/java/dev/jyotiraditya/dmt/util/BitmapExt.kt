@@ -132,7 +132,45 @@ suspend fun Bitmap.fieldColor(): Color = withContext(Dispatchers.Default) {
     if (bestScore < 0f) return@withContext neutralField(brightness / pixels.size)
 
     PlatformColor.colorToHSV(bestColor, hsv)
-    presetTint(hsv[0], hsv[1], bestPopulation)
+    // The border is usually the cover's background, which is the colour the page should take.
+    val hue = borderHue(pixels, width, height) ?: hsv[0]
+    presetTint(hue, hsv[1], bestPopulation)
+}
+
+/** The dominant hue along the cover's border, or null when the border is mostly neutral. */
+private fun borderHue(pixels: IntArray, width: Int, height: Int): Float? {
+    val bins = FloatArray(12)
+    val hueSums = FloatArray(12)
+    val hsv = FloatArray(3)
+    var total = 0f
+    var counted = 0
+
+    fun add(pixel: Int) {
+        if (PlatformColor.alpha(pixel) < MIN_ALPHA) return
+        PlatformColor.colorToHSV(pixel, hsv)
+        if (hsv[2] < MIN_VALUE || hsv[2] > MAX_VALUE) return
+        if (hsv[1] < 0.15f) return
+        val bin = (hsv[0] / 30f).toInt() % 12
+        val weight = hsv[1] * hsv[2]
+        bins[bin] += weight
+        hueSums[bin] += hsv[0] * weight
+        total += weight
+        counted++
+    }
+
+    for (x in 0 until width) {
+        add(pixels[x])
+        add(pixels[(height - 1) * width + x])
+    }
+    for (y in 1 until height - 1) {
+        add(pixels[y * width])
+        add(pixels[y * width + width - 1])
+    }
+    if (counted == 0 || total < 0.5f) return null
+    var best = 0
+    for (i in 1 until bins.size) if (bins[i] > bins[best]) best = i
+    if (bins[best] / total < 0.25f) return null
+    return hueSums[best] / bins[best]
 }
 
 /** Hues that keep the page tint varied but always readable. */
@@ -152,14 +190,22 @@ private val PresetHues =
         155f,
         140f,
         120f,
+        65f,
+        55f,
+        45f,
     )
 
 /** The preset tint nearest [hue], or a neutral when the cover has little colour. */
 private fun presetTint(hue: Float, chroma: Float, population: Float): Color {
     if (chroma < 0.12f || population < 0.08f) return neutralField(0.5f)
     val nearest = PresetHues.minBy { angularDistance(hue, it) }
-    // Greens need more saturation so they read as green rather than olive.
-    val saturation = if (nearest in 100f..160f) 0.68f else 0.55f
+    // Greens and yellows need more saturation so they read as their hue, not olive.
+    val saturation =
+        when {
+            nearest in 40f..70f -> 0.72f
+            nearest in 100f..160f -> 0.68f
+            else -> 0.55f
+        }
     return Color.hsv(nearest, saturation, 0.55f)
 }
 

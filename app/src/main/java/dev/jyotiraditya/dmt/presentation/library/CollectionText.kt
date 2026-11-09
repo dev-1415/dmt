@@ -11,8 +11,14 @@ import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.model.asCredit
 import dev.jyotiraditya.dmt.util.asHoursMinutes
 import dev.jyotiraditya.dmt.util.asTime
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private const val SEPARATOR = " · "
+
+private val MONTH_YEAR = DateTimeFormatter.ofPattern("MM-yyyy", Locale.getDefault())
 
 /** A track's artist, album and length, leaving out what is blank or not asked for. */
 fun trackSummary(track: Track, artist: Boolean = true, album: Boolean = true): String =
@@ -23,6 +29,21 @@ fun trackSummary(track: Track, artist: Boolean = true, album: Boolean = true): S
     )
         .filter(String::isNotBlank)
         .joinToString(SEPARATOR)
+
+/** A track's artist and album, without its length. */
+fun trackCredit(track: Track): String =
+    listOfNotNull(track.artist.asCredit(), track.album)
+        .filter(String::isNotBlank)
+        .joinToString(SEPARATOR)
+
+/** The month and year a track was last changed, or added when it has no modified date. */
+fun trackMonth(track: Track): String {
+    val seconds = track.dateModified.takeIf { it > 0 } ?: track.dateAdded
+    if (seconds <= 0) return ""
+    return Instant.ofEpochSecond(seconds)
+        .atZone(ZoneId.systemDefault())
+        .format(MONTH_YEAR)
+}
 
 /** How many albums and tracks an artist has, such as `2 albums · 14 tracks`. */
 @Composable

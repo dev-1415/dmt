@@ -16,17 +16,13 @@ fun Lyrics.toLrc(): String {
 
 private fun LyricLine.lrcLine(): String {
     val stamp = "[${startMs.lrcTime()}]"
-    if (words.isEmpty()) return stamp + text
+    // A secondary line keeps its side after the round trip; primary is the default.
+    val voice = if (this.voice == Voice.SECONDARY) "v1:" else ""
+    if (words.isEmpty()) return stamp + voice + text
     return buildString {
         append(stamp)
-        var cursor = 0
-        words.forEach { word ->
-            if (word.start > cursor) append(text, cursor, word.start)
-            append('<').append(word.startMs.lrcTime()).append('>')
-            append(text, word.start, word.end)
-            cursor = word.end
-        }
-        if (cursor < text.length) append(text, cursor, text.length)
+        append(voice)
+        appendTimedText(text, words)
     }
 }
 
@@ -37,16 +33,30 @@ private fun StringBuilder.appendSecondary(marker: String, lineStartMs: Long, tex
     if (text.words.isEmpty()) {
         append(text.text)
     } else {
-        var cursor = 0
-        text.words.forEach { word ->
-            if (word.start > cursor) append(text.text, cursor, word.start)
-            append('<').append(word.startMs.lrcTime()).append('>')
-            append(text.text, word.start, word.end)
-            cursor = word.end
-        }
-        if (cursor < text.text.length) append(text.text, cursor, text.text.length)
+        appendTimedText(text.text, text.words)
     }
     append(']')
+}
+
+/**
+ * Appends [text] with its word start tags, a `bg` flag on backing words, and a closing tag for
+ * the last word so its real end time survives the round trip.
+ */
+private fun StringBuilder.appendTimedText(text: String, words: List<LyricWord>) {
+    var cursor = 0
+    words.forEach { word ->
+        if (word.start > cursor) append(text, cursor, word.start)
+        append('<').append(word.startMs.lrcTime())
+        if (word.background) append(" bg")
+        append('>')
+        append(text, word.start, word.end)
+        cursor = word.end
+    }
+    if (cursor < text.length) append(text, cursor, text.length)
+    val last = words.lastOrNull()
+    if (last != null && last.endMs > last.startMs) {
+        append('<').append(last.endMs.lrcTime()).append('>')
+    }
 }
 
 private fun Long.lrcTime(): String {

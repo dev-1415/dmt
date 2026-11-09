@@ -42,7 +42,34 @@ class LyricsLrcTest {
                     ),
             )
         val lyrics = Lyrics(listOf(line), synced = true)
-        assertEquals("[00:01.00]<00:01.00>Hello <00:01.50>world", lyrics.toLrc())
+        assertEquals(
+            "[00:01.00]<00:01.00>Hello <00:01.50>world<00:02.00>",
+            lyrics.toLrc(),
+        )
+    }
+
+    @Test
+    fun `backing words keep their flag and last word end`() {
+        val line =
+            LyricLine(
+                startMs = 1_000,
+                endMs = 3_000,
+                text = "Hello (ooh)",
+                words =
+                    listOf(
+                        LyricWord(1_000, 1_500, 0, 5, background = false),
+                        LyricWord(1_500, 3_000, 7, 10, background = true),
+                    ),
+            )
+        val lrc = Lyrics(listOf(line), synced = true).toLrc()
+        assertEquals(
+            "[00:01.00]<00:01.00>Hello (<00:01.50 bg>ooh)<00:03.00>",
+            lrc,
+        )
+
+        val parsed = LyricsParser.parse(lrc)!!.lines.single()
+        assertEquals(listOf(false, true), parsed.words.map { it.background })
+        assertEquals(3_000, parsed.words.last().endMs)
     }
 
     @Test
@@ -68,9 +95,9 @@ class LyricsLrcTest {
             )
         val lrc = Lyrics(listOf(line), synced = true).toLrc()
         assertEquals(
-            "[00:01.00]<00:01.00>こんにちは\n" +
-                "[bg: [00:01.00]<00:01.00>Konnichiwa]\n" +
-                "[tr: [00:01.00]<00:01.00>Hello]",
+            "[00:01.00]<00:01.00>こんにちは<00:02.00>\n" +
+                "[bg: [00:01.00]<00:01.00>Konnichiwa<00:02.00>]\n" +
+                "[tr: [00:01.00]<00:01.00>Hello<00:02.00>]",
             lrc,
         )
 

@@ -16,8 +16,14 @@ internal enum class TagStyle(val open: Char, val close: Char) {
 
 /**
  * A time tag in a line, from its opening bracket at [start] to just past its closing one at [end].
+ * [background] marks a word sung as a backing vocal, written as `<00:01.00 bg>`.
  */
-internal data class TimeTag(val ms: Long, val start: Int, val end: Int)
+internal data class TimeTag(
+    val ms: Long,
+    val start: Int,
+    val end: Int,
+    val background: Boolean = false,
+)
 
 /** The `mm:ss.xx` time tag in [style] opening at [index], or null if none does. */
 internal fun String.timeTagAt(index: Int, style: TagStyle): TimeTag? {
@@ -33,10 +39,23 @@ internal fun String.timeTagAt(index: Int, style: TagStyle): TimeTag? {
         fractionMs = fraction.value * FRACTION_UNIT_MS[fraction.count - 1]
         cursor = fraction.end
     }
+    // An optional `bg` marks the word as a backing vocal, as in `<00:01.00 bg>`.
+    var background = false
+    if (getOrNull(cursor) == ' ') {
+        val probe = cursor + 1
+        if (
+            getOrNull(probe)?.lowercaseChar() == 'b' &&
+                getOrNull(probe + 1)?.lowercaseChar() == 'g'
+        ) {
+            background = true
+            cursor = probe + 2
+            while (getOrNull(cursor) == ' ') cursor++
+        }
+    }
     if (getOrNull(cursor) != style.close) return null
 
     val ms = minutes.value * MS_PER_MINUTE + seconds.value * MS_PER_SECOND + fractionMs
-    return TimeTag(ms = ms, start = index, end = cursor + 1)
+    return TimeTag(ms = ms, start = index, end = cursor + 1, background = background)
 }
 
 internal fun String.timeTags(style: TagStyle): List<TimeTag> {

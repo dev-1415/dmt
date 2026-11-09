@@ -267,7 +267,8 @@ internal fun LazyListScope.folderContents(
         itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
             TrackRow(
                 track = track,
-                meta = trackSummary(track),
+                meta = trackCredit(track),
+                metaTrailing = trackMonth(track),
                 current = track.id.toString() == state.nowPlayingId,
                 playing = playing,
                 onClick = { dispatch(DmtAction.PlayAt(tracks, index)) },

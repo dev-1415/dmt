@@ -41,7 +41,9 @@ fun Color.tintedDark(lightness: Float): Color {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(toArgb(), hsl)
     hsl[1] = (hsl[1] * 0.72f).coerceIn(0f, 1f)
-    hsl[2] = lightness
+    // Yellow and green read as olive when they are too dark, so lift them a little.
+    val warm = hsl[0] in 35f..75f || hsl[0] in 100f..160f
+    hsl[2] = if (warm) (lightness + 0.08f).coerceAtMost(0.30f) else lightness
     return lerp(TintBase, Color(ColorUtils.HSLToColor(hsl)), 0.78f)
 }
 

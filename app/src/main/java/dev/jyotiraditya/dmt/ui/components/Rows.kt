@@ -64,6 +64,7 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     number: Int? = null,
     onLongClick: (() -> Unit)? = null,
+    metaTrailing: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val mark = LocalAccent.current.highlight
@@ -107,7 +108,7 @@ fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
             val barsInline = current && number == null
-            if (meta.isNotEmpty() || barsInline || track.cue) {
+            if (meta.isNotEmpty() || metaTrailing != null || barsInline || track.cue) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (barsInline) {
                         PlayingBars(
@@ -124,13 +125,37 @@ fun TrackRow(
                             modifier = Modifier.padding(end = 6.dp),
                         )
                     }
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            text = meta,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Muted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                if (metaTrailing != null) {
+                                    Modifier.weight(1f, fill = false)
+                                } else {
+                                    Modifier
+                                },
+                        )
+                    }
+                    if (metaTrailing != null) {
+                        if (meta.isNotEmpty()) {
+                            Text(
+                                text = " · ",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Muted,
+                                maxLines = 1,
+                            )
+                        }
+                        Text(
+                            text = metaTrailing,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Muted,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

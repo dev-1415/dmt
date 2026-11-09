@@ -34,7 +34,7 @@ internal fun readWordTimes(text: String): TimedText {
                 endMs = endMs,
                 start = wordStart,
                 end = wordEnd,
-                background = false,
+                background = tag.background,
             )
         if (endMs > tag.ms) {
             sungMs += endMs - tag.ms
