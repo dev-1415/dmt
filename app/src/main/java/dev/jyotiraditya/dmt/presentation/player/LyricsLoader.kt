@@ -29,8 +29,9 @@ internal class LyricsLoader(
             val track = store.current.library.track(forId)
             val preferred = savedSource()
             val result = Result.success(track?.let { getLyrics(it, preferred) })
-            val sources = track?.let { getLyrics.availableSources(it) }.orEmpty().toSourceStatuses()
-            store.reduce { it.withLyrics(forId, preferred, result, sources) }
+            // The source sheet reads the other sources when it opens, so a track change only
+            // reads the lyrics it shows.
+            store.reduce { it.withLyrics(forId, preferred, result, emptyMap()) }
         }
     }
 

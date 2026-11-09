@@ -37,6 +37,7 @@ internal class PlaybackLibraryCallback(
     private val sleepTimer: SleepTimer,
     private val library: suspend () -> LibrarySnapshot,
     private val onQueueReplaced: () -> Unit,
+    private val startForeground: () -> Unit,
 ) : MediaLibrarySession.Callback {
 
     override fun onConnect(
@@ -49,6 +50,7 @@ internal class PlaybackLibraryCallback(
                 .add(PlaybackCommands.SLEEP_GET)
                 .add(PlaybackCommands.TOGGLE_SHUFFLE)
                 .add(PlaybackCommands.CYCLE_REPEAT)
+                .add(PlaybackCommands.START_FOREGROUND)
                 .build()
         return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
             .setAvailableSessionCommands(commands)
@@ -85,6 +87,11 @@ internal class PlaybackLibraryCallback(
 
                 PlaybackCommands.CYCLE_REPEAT.customAction -> {
                     player.cycleRepeat()
+                    Bundle.EMPTY
+                }
+
+                PlaybackCommands.START_FOREGROUND.customAction -> {
+                    startForeground()
                     Bundle.EMPTY
                 }
 

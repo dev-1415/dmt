@@ -11,6 +11,7 @@ object DmtIcons {
     val Shuffle = R.drawable.ic_shuffle
     val Sleep = R.drawable.ic_sleep
     val Speed = R.drawable.ic_speed
+    val Volume = R.drawable.ic_volume
     val Repeat = R.drawable.ic_repeat
     val RepeatOne = R.drawable.ic_repeat_one
     val Queue = R.drawable.ic_queue

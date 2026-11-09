@@ -39,7 +39,8 @@ internal fun Context.buildMusicPlayer(dataSourceFactory: DataSource.Factory): Ex
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
         .setAudioAttributes(attributes, handleAudioFocus)
         .setHandleAudioBecomingNoisy(true)
-        .setWakeMode(C.WAKE_MODE_NETWORK)
+        // Local files only need a partial wake lock; remote tracks switch this to network below.
+        .setWakeMode(C.WAKE_MODE_LOCAL)
         .setTrackSelector(trackSelector)
         .setSeekBackIncrementMs(SEEK_HOLD_STEP_MS)
         .setSeekForwardIncrementMs(SEEK_HOLD_STEP_MS)

@@ -62,8 +62,8 @@ import dev.jyotiraditya.dmt.ui.components.SearchBox
 import dev.jyotiraditya.dmt.ui.components.SheetAction
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.TextLink
-import dev.jyotiraditya.dmt.ui.components.bottomSeparator
 import dev.jyotiraditya.dmt.ui.components.pressable
+import dev.jyotiraditya.dmt.ui.components.topSeparator
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.LocalAccent
@@ -158,30 +158,6 @@ internal fun QueuePage(
         scrollToCurrent = false
     }
     Column(modifier = Modifier.fillMaxSize().background(tint)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier.fillMaxWidth()
-                    .bottomSeparator()
-                    .padding(horizontal = Margin, vertical = 4.dp),
-        ) {
-            SearchBox(
-                query = query,
-                hint = stringResource(R.string.queue_search_hint),
-                onQuery = { query = it },
-                modifier = Modifier.weight(1f),
-            )
-            IconTap(
-                icon = DmtIcons.Play,
-                description = stringResource(R.string.nav_now_playing),
-                onClick = {
-                    if (currentPosition < 0) query = ""
-                    scrollToCurrent = true
-                },
-                enabled = currentIndex != null,
-                ink = Ink,
-            )
-        }
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,
@@ -204,6 +180,30 @@ internal fun QueuePage(
             ScrollBar(
                 state = listState,
                 modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier.fillMaxWidth()
+                    .topSeparator()
+                    .padding(horizontal = Margin, vertical = 4.dp),
+        ) {
+            SearchBox(
+                query = query,
+                hint = stringResource(R.string.queue_search_hint),
+                onQuery = { query = it },
+                modifier = Modifier.weight(1f),
+            )
+            IconTap(
+                icon = DmtIcons.Play,
+                description = stringResource(R.string.nav_now_playing),
+                onClick = {
+                    if (currentPosition < 0) query = ""
+                    scrollToCurrent = true
+                },
+                enabled = currentIndex != null,
+                ink = Ink,
             )
         }
     }

@@ -21,6 +21,12 @@ object PlaybackCommands {
 
     val CYCLE_REPEAT = command("CYCLE_REPEAT")
 
+    /**
+     * Promotes the service to the foreground while the app is visible, so Android 17 grants it
+     * while-in-use audio capability before playback starts.
+     */
+    val START_FOREGROUND = command("START_FOREGROUND")
+
     private fun command(name: String) =
         SessionCommand("dev.jyotiraditya.dmt.command.$name", Bundle.EMPTY)
 }

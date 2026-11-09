@@ -133,6 +133,7 @@
     <string name="player_previous">Previous</string>
     <string name="player_shuffle">Shuffle</string>
     <string name="player_repeat">Repeat</string>
+    <string name="player_volume">Volume</string>
     <string name="player_lyrics">Lyrics</string>
     <string name="player_cover">Cover</string>
     <string name="now_playing_empty_body">Play a track to see it here.</string>

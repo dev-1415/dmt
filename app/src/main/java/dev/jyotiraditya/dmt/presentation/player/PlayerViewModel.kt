@@ -1,7 +1,7 @@
 package dev.jyotiraditya.dmt.presentation.player
 
 import android.content.Context
-import android.util.Log
+import android.os.Bundle
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -27,6 +27,7 @@ import dev.jyotiraditya.dmt.domain.usecase.ConnectSourceUseCase
 import dev.jyotiraditya.dmt.domain.usecase.GetLyricsUseCase
 import dev.jyotiraditya.dmt.domain.usecase.GetTrackTechUseCase
 import dev.jyotiraditya.dmt.domain.usecase.ScanLibraryUseCase
+import dev.jyotiraditya.dmt.playback.PlaybackCommands
 import dev.jyotiraditya.dmt.playback.PlaybackConnection
 import dev.jyotiraditya.dmt.presentation.settings.loginMessage
 import dev.jyotiraditya.dmt.util.audioPermission
@@ -61,7 +62,6 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 private val LIBRARY_SETTLE = 500.milliseconds
-private const val TAG = "PlayerViewModel"
 
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -218,6 +218,7 @@ constructor(
             is DmtAction.PlayAt ->
                 c?.run {
                     reduce { it.copy(error = null) }
+                    startForeground()
                     playTracks(intent.list, intent.index)
                 }
 
@@ -225,6 +226,7 @@ constructor(
                 c?.takeIf { intent.list.isNotEmpty() }
                     ?.run {
                         reduce { it.copy(error = null) }
+                        startForeground()
                         playTracks(intent.list, intent.list.indices.random())
                         shuffleModeEnabled = true
                     }
@@ -246,7 +248,11 @@ constructor(
             DmtAction.ClearUpcoming ->
                 c?.clearUpcoming(currentState.queue, currentState.queuePosition)
 
-            is DmtAction.Jump -> c?.jumpTo(intent.index)
+            is DmtAction.Jump ->
+                c?.run {
+                    startForeground()
+                    jumpTo(intent.index)
+                }
 
             is DmtAction.Seek ->
                 c?.run {
@@ -352,6 +358,11 @@ constructor(
         restoreSession()
     }
 
+    /** Promotes the service to the foreground before playback, for Android 17 while-in-use audio. */
+    private fun MediaController.startForeground() {
+        sendCustomCommand(PlaybackCommands.START_FOREGROUND, Bundle.EMPTY)
+    }
+
     private fun scan(refresh: Boolean = false) {
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
@@ -368,7 +379,6 @@ constructor(
                     recordScan(LibraryScan.between(before.tracks, after.tracks, compare = refresh))
                 }
                 .onFailure { failure ->
-                    Log.w(TAG, "Library scan failed", failure)
                     showScanFailure(failure, keepLibrary = currentState.library !== before)
                 }
             reduce { it.copy(scanning = false) }

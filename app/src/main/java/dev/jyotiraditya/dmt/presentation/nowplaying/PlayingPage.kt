@@ -84,6 +84,7 @@ internal fun PlayingPage(
     dispatch: (DmtAction) -> Unit,
     cover: (@Composable () -> Unit)?,
     lyricsOpen: Boolean,
+    active: Boolean,
     onOpenArtist: () -> Unit,
     onOpenAlbum: () -> Unit,
     onOpenDetails: () -> Unit,
@@ -116,11 +117,12 @@ internal fun PlayingPage(
                         state = state,
                         player = player,
                         background = field,
+                        active = active,
                         onClick = onToggleLyrics,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     )
                 }
-                TrackTitle(state, ink, dim, onOpenArtist)
+                TrackTitle(state, ink, dim, active, onOpenArtist)
             }
         },
         seek = { SeekRow(state, player, field, ink, dim) },
@@ -141,6 +143,7 @@ internal fun PlayerCover(
     player: Player,
     steps: SeekSteps,
     hidden: Boolean,
+    active: Boolean,
     onPlaced: (LayoutCoordinates) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,7 +180,7 @@ internal fun PlayerCover(
             state.animatedArtUrl?.let { url ->
                 AnimatedCover(
                     url = url,
-                    playing = rememberIsPlaying(player) && !hidden,
+                    playing = rememberIsPlaying(player) && !hidden && active,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -203,7 +206,13 @@ private fun SeekReadout(player: Player, stepMs: Long, modifier: Modifier = Modif
 
 /** Title and credit on one line each; a long title scrolls so the layout never shifts. */
 @Composable
-private fun TrackTitle(state: DmtState, ink: Color, dim: Color, onOpenArtist: () -> Unit) {
+private fun TrackTitle(
+    state: DmtState,
+    ink: Color,
+    dim: Color,
+    active: Boolean,
+    onOpenArtist: () -> Unit,
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         AnimatedContent(
             targetState = state.title,
@@ -225,7 +234,7 @@ private fun TrackTitle(state: DmtState, ink: Color, dim: Color, onOpenArtist: ()
                 modifier =
                     Modifier.fillMaxWidth()
                         .basicMarquee(
-                            iterations = Int.MAX_VALUE,
+                            iterations = if (active) Int.MAX_VALUE else 0,
                             initialDelayMillis = PlayerDimens.MARQUEE_DELAY_MS,
                         ),
             )

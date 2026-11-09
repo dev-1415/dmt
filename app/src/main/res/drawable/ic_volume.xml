@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols Sharp, volume up, Apache 2.0 licence. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <!-- The symbols are drawn in a 0,-960 viewBox. -->
+    <group android:translateY="960">
+        <path
+            android:fillColor="@android:color/white"
+            android:pathData="M560-131v-82q90-26 145-100.5T760-480q0-92-55-166.5T560-747v-82q124 28 202 125.5T840-480q0 126-78 223.5T560-131ZM120-360v-240h160l200-200v640L280-360H120Zm440 40v-322q47 22 73.5 66t26.5 96q0 51-26.5 94.5T560-320ZM280-440h114l86 86v-252l-86 86H280v80Z" />
+    </group>
+</vector>

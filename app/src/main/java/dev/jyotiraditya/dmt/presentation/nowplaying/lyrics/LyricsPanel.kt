@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +48,7 @@ internal fun LyricsPanel(
     player: Player,
     dispatch: (DmtAction) -> Unit,
     background: Color,
+    active: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val lyrics = state.lyrics
@@ -66,7 +69,7 @@ internal fun LyricsPanel(
                     position =
                         rememberPlaybackPosition(
                             player,
-                            moving = rememberIsPlaying(player) && lyrics.synced,
+                            moving = rememberIsPlaying(player) && lyrics.synced && active,
                             leadMs = LEAD_MS,
                         ),
                     durationMs = state.durationMs,
@@ -105,6 +108,7 @@ internal fun CurrentLyricLine(
     state: DmtState,
     player: Player,
     background: Color,
+    active: Boolean,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
@@ -131,12 +135,20 @@ internal fun CurrentLyricLine(
             val position =
                 rememberPlaybackPosition(
                     player,
-                    moving = rememberIsPlaying(player) && lyrics.synced,
+                    moving = rememberIsPlaying(player) && lyrics.synced && active,
                     leadMs = LEAD_MS,
                 )
+            // Read the position through a derived state so a new frame only redraws the sweep
+            // instead of recomposing this line.
+            val lineIndex by
+                remember(lyrics) {
+                    derivedStateOf {
+                        if (lyrics.synced) lyrics.lines.indexAt(position.value) else -1
+                    }
+                }
             val line =
                 if (lyrics.synced) {
-                    lyrics.lines.getOrNull(lyrics.lines.indexAt(position.value))
+                    lyrics.lines.getOrNull(lineIndex)
                 } else {
                     lyrics.lines.firstOrNull()
                 }

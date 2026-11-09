@@ -7,6 +7,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -241,11 +242,12 @@ fun SearchBox(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(48.dp)
                 .background(Surface)
+                .border(1.dp, Muted.copy(alpha = 0.5f))
                 .padding(start = 16.dp, end = 4.dp),
     ) {
-        DmtIcon(icon = DmtIcons.Search, tint = Ink, size = 22.dp)
+        DmtIcon(icon = DmtIcons.Search, tint = Muted, size = 22.dp)
         Spacer(modifier = Modifier.width(12.dp))
         BasicTextField(
             value = query,

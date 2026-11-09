@@ -18,3 +18,14 @@ fun Modifier.bottomSeparator(color: Color = Muted.copy(alpha = 0.4f)): Modifier 
             size = Size(size.width, stroke),
         )
     }
+
+/** A subtle 1dp line along the top edge, marking a pinned section. */
+fun Modifier.topSeparator(color: Color = Muted.copy(alpha = 0.4f)): Modifier =
+    drawBehind {
+        val stroke = 1.dp.toPx()
+        drawRect(
+            color = color,
+            topLeft = Offset(0f, 0f),
+            size = Size(size.width, stroke),
+        )
+    }

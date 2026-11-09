@@ -3,6 +3,7 @@ package dev.jyotiraditya.dmt.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.media.audiofx.AudioEffect
 import android.util.LruCache
 import androidx.annotation.OptIn
@@ -30,6 +31,7 @@ import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.data.repository.PreferencesRepository
 import dev.jyotiraditya.dmt.domain.model.LastSession
 import dev.jyotiraditya.dmt.domain.model.LibrarySnapshot
+import dev.jyotiraditya.dmt.domain.model.TrackSource
 import dev.jyotiraditya.dmt.domain.usecase.ScanLibraryUseCase
 import dev.jyotiraditya.dmt.util.notificationPermission
 import kotlinx.coroutines.CoroutineScope
@@ -110,6 +112,7 @@ class PlaybackService : MediaLibraryService() {
                 sleepTimer = sleepTimer,
                 library = ::library,
                 onQueueReplaced = { queueReplaced = true },
+                startForeground = ::startForegroundForPlayback,
             )
         // Covers are decoded no larger than the notification and Android Auto show them.
         val artworkLoader =
@@ -186,7 +189,13 @@ class PlaybackService : MediaLibraryService() {
         override fun onRepeatModeChanged(repeatMode: Int) = publishButtons()
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (!isPlaying) saveSession()
+            if (isPlaying) {
+                // A fade or a stale gain must never leave a playing track silent.
+                if (sleepTimer.endAt == null) fadeLevel = 1f
+                applyVolume()
+            } else {
+                saveSession()
+            }
         }
 
         override fun onPositionDiscontinuity(
@@ -200,6 +209,7 @@ class PlaybackService : MediaLibraryService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             saveSession()
             applyReplayGain(mediaItem)
+            updateWakeMode(player, mediaItem)
         }
 
         override fun onAudioSessionIdChanged(audioSessionId: Int) {
@@ -214,6 +224,41 @@ class PlaybackService : MediaLibraryService() {
         mediaSession?.player?.volume = trackVolume * fadeLevel
     }
 
+    /**
+     * Starts the media foreground service while the app is visible. Android 17 only grants the
+     * while-in-use capability needed for background audio to services promoted from the foreground.
+     */
+    private fun startForegroundForPlayback() {
+        val channel =
+            NotificationChannelCompat.Builder(
+                DefaultMediaNotificationProvider.DEFAULT_CHANNEL_ID,
+                NotificationManagerCompat.IMPORTANCE_LOW,
+            )
+                .setName(getString(R.string.notification_channel_playback))
+                .build()
+        NotificationManagerCompat.from(this).createNotificationChannel(channel)
+        val metadata = mediaSession?.player?.mediaMetadata
+        val notification =
+            NotificationCompat.Builder(this, DefaultMediaNotificationProvider.DEFAULT_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_dmt)
+                .setContentTitle(metadata?.title ?: getString(R.string.app_name))
+                .setContentText(metadata?.artist ?: getString(R.string.notification_channel_playback))
+                .setContentIntent(sessionActivity())
+                .setOnlyAlertOnce(true)
+                .setOngoing(true)
+                .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+                .build()
+        try {
+            startForeground(
+                DefaultMediaNotificationProvider.DEFAULT_NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+            )
+        } catch (e: RuntimeException) {
+            // The system may refuse a background start; Media3 promotes the service on play.
+        }
+    }
+
     /** Shuffles the queue with the playing item first. */
     @OptIn(UnstableApi::class)
     private fun reshuffle(player: ExoPlayer) {
@@ -225,6 +270,21 @@ class PlaybackService : MediaLibraryService() {
             )
         shufflePlan = plan
         player.shuffleOrder = plan.order()
+    }
+
+    /** Local files only need a partial wake lock; streams keep the network awake. */
+    private fun updateWakeMode(player: ExoPlayer, mediaItem: MediaItem?) {
+        val scheme = mediaItem?.localConfiguration?.uri?.scheme
+        if (scheme != null) {
+            val local = scheme == "file" || scheme == "content"
+            player.setWakeMode(if (local) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK)
+            return
+        }
+        val id = mediaItem?.mediaId?.toLongOrNull() ?: return
+        scope.launch {
+            val local = library().track(id)?.source == TrackSource.LOCAL
+            player.setWakeMode(if (local) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK)
+        }
     }
 
     /** Sets [trackVolume] from the ReplayGain tag of [mediaItem] when normalizing. */

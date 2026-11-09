@@ -45,6 +45,7 @@ internal fun NowPlayingPage(
     player: Player,
     field: Color,
     dispatch: (DmtAction) -> Unit,
+    active: Boolean,
     onOpenArtist: () -> Unit,
     onOpenAlbum: () -> Unit,
 ) {
@@ -76,6 +77,7 @@ internal fun NowPlayingPage(
                 player = player,
                 steps = steps,
                 hidden = showLyrics,
+                active = active,
                 onPlaced = {},
                 modifier = Modifier.fillMaxSize(),
             )
@@ -89,6 +91,7 @@ internal fun NowPlayingPage(
                     player = player,
                     dispatch = dispatch,
                     background = playerBackground,
+                    active = active,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -122,6 +125,7 @@ internal fun NowPlayingPage(
                         dispatch = dispatch,
                         cover = null,
                         lyricsOpen = showLyrics,
+                        active = active,
                         onOpenArtist = onOpenArtist,
                         onOpenAlbum = onOpenAlbum,
                         onOpenDetails = { showDetails = true },
@@ -138,6 +142,7 @@ internal fun NowPlayingPage(
                 dispatch = dispatch,
                 cover = cover,
                 lyricsOpen = showLyrics,
+                active = active,
                 onOpenArtist = onOpenArtist,
                 onOpenAlbum = onOpenAlbum,
                 onOpenDetails = { showDetails = true },

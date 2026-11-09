@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -19,6 +18,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.media3.ui.compose.state.rememberPresentationState
@@ -52,8 +52,10 @@ fun AnimatedCover(url: String, playing: Boolean, modifier: Modifier = Modifier) 
 
     DisposableEffect(player) { onDispose { player.release() } }
 
-    LaunchedEffect(player, playing) {
+    // Stop decoding the looping cover while the app is not in the foreground.
+    LifecycleStartEffect(player, playing) {
         player.playWhenReady = playing
+        onStopOrDispose { player.playWhenReady = false }
     }
 
     val presentation = rememberPresentationState(player)

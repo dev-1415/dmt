@@ -66,6 +66,7 @@ internal fun Transport(
     val seekForward = rememberSeekForwardButtonState(player)
     val shuffle = rememberShuffleButtonState(player)
     val repeat = rememberRepeatButtonState(player, REPEAT_MODES)
+    var volumeSheet by rememberSaveable { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
@@ -111,6 +112,14 @@ internal fun Transport(
             size = PlayerDimens.SkipButton,
             iconSize = PlayerDimens.SkipGlyph,
         )
+        IconTap(
+            icon = DmtIcons.Volume,
+            description = stringResource(R.string.player_volume),
+            onClick = { volumeSheet = true },
+            ink = ink,
+            size = PlayerDimens.SkipButton,
+            iconSize = PlayerDimens.SkipGlyph,
+        )
         Spacer(modifier = Modifier.weight(1f))
         IconTap(
             icon = DmtIcons.Shuffle,
@@ -135,6 +144,9 @@ internal fun Transport(
             ink = ink,
             field = field,
         )
+    }
+    if (volumeSheet) {
+        VolumeSheet(onDismiss = { volumeSheet = false })
     }
 }
 

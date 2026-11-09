@@ -8,15 +8,15 @@ internal object PlayerDimens {
     /** The largest the cover grows on big screens. */
     val MaxCover = 480.dp
 
-    val PlayButton = 76.dp
+    val PlayButton = 64.dp
 
-    val PlayGlyph = 34.dp
+    val PlayGlyph = 30.dp
 
-    val SkipButton = 60.dp
+    val SkipButton = 48.dp
 
-    val SkipGlyph = 30.dp
+    val SkipGlyph = 24.dp
 
-    val PlayToSkip = 12.dp
+    val PlayToSkip = 8.dp
 
     /** Space between a label and the line under it, such as title and artist. */
     val LineGap = 4.dp

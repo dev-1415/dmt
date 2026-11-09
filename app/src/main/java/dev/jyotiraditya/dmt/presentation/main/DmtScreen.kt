@@ -216,18 +216,11 @@ fun DmtScreen(
                 go(next)
             }
             if (!rail) {
-                TopBar(
-                    selected = selected,
-                    places = visiblePlaces,
-                    back = back,
-                    field = field,
-                    settingsOpen = settingsOpen,
-                    onBack = ::goBack,
-                    onPlace = openPlace,
-                    onSettings = {
-                        if (settingsOpen) closeSettings() else openSettings()
-                    },
-                )
+                if (back != null) {
+                    BackBar(label = back.label, field = field, onBack = ::goBack)
+                } else {
+                    Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                }
             }
             Row(modifier = Modifier.weight(1f)) {
                 if (rail) {
@@ -265,6 +258,7 @@ fun DmtScreen(
                                 beyondViewportPageCount = 1,
                                 modifier = Modifier.fillMaxSize(),
                             ) { page ->
+                                val active = pager.currentPage == page
                                 when (val shown = visiblePlaces[page]) {
                                     Place.QUEUE ->
                                         QueuePage(
@@ -281,6 +275,7 @@ fun DmtScreen(
                                                 player = player,
                                                 field = field,
                                                 dispatch = dispatch,
+                                                active = active,
                                                 onOpenArtist = openArtist,
                                                 onOpenAlbum = openAlbum,
                                             )
@@ -330,7 +325,20 @@ fun DmtScreen(
                 }
             }
             Notice(error = state.error, notice = state.notice)
-            Spacer(modifier = Modifier.height(navBottom))
+            if (rail) {
+                Spacer(modifier = Modifier.height(navBottom))
+            } else {
+                BottomBar(
+                    selected = selected,
+                    places = visiblePlaces,
+                    settingsOpen = settingsOpen,
+                    field = field,
+                    onPlace = openPlace,
+                    onSettings = {
+                        if (settingsOpen) closeSettings() else openSettings()
+                    },
+                )
+            }
         }
 
         if (state.lyricsSourcesOpen) {

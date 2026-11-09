@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -34,13 +35,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.LibraryTab
-import dev.jyotiraditya.dmt.presentation.library.BackLink
 import dev.jyotiraditya.dmt.presentation.player.DmtView
 import dev.jyotiraditya.dmt.ui.components.DmtIcon
 import dev.jyotiraditya.dmt.ui.components.IconTap
 import dev.jyotiraditya.dmt.ui.components.background
 import dev.jyotiraditya.dmt.ui.components.bottomSeparator
 import dev.jyotiraditya.dmt.ui.components.pressable
+import dev.jyotiraditya.dmt.ui.components.topSeparator
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.Margin
@@ -83,15 +84,53 @@ enum class Place(
 
 internal val BackRowHeight = 52.dp
 
-/** The back link inside a page, with the destinations taking the rest of the bar. */
+/** The back link above a page, with the player tint behind it. */
 @Composable
-internal fun TopBar(
+internal fun BackBar(
+    label: String,
+    field: Color,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val background = field.darkenedForPlayer()
+    val ink = background.inkOn()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(background)
+                .bottomSeparator()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .height(52.dp)
+                .padding(horizontal = Margin),
+    ) {
+        IconTap(
+            icon = DmtIcons.ChevronLeft,
+            description = stringResource(R.string.nav_back),
+            onClick = onBack,
+            ink = ink,
+            size = 40.dp,
+            iconSize = 24.dp,
+            modifier = Modifier.offset(x = (-8).dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            color = ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** The top-level destinations and Settings, pinned below the content. */
+@Composable
+internal fun BottomBar(
     selected: Float?,
     places: List<Place>,
-    back: BackLink?,
-    field: Color,
     settingsOpen: Boolean,
-    onBack: () -> Unit,
+    field: Color,
     onPlace: (Place) -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -105,22 +144,11 @@ internal fun TopBar(
             modifier
                 .fillMaxWidth()
                 .background(background)
-                .bottomSeparator()
-                .windowInsetsPadding(WindowInsets.statusBars)
+                .topSeparator()
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .height(60.dp)
                 .padding(horizontal = Margin),
     ) {
-        if (back != null) {
-            IconTap(
-                icon = DmtIcons.ChevronLeft,
-                description = stringResource(R.string.nav_back),
-                onClick = onBack,
-                ink = ink,
-                size = 40.dp,
-                iconSize = 24.dp,
-                modifier = Modifier.offset(x = (-8).dp),
-            )
-        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(20.dp),
             modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),

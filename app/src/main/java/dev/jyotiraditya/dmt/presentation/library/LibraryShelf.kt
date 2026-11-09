@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,7 +55,7 @@ import dev.jyotiraditya.dmt.ui.components.SearchBox
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.TextLink
 import dev.jyotiraditya.dmt.ui.components.TrackRow
-import dev.jyotiraditya.dmt.ui.components.bottomSeparator
+import dev.jyotiraditya.dmt.ui.components.topSeparator
 import dev.jyotiraditya.dmt.ui.motion.sharedElement
 import dev.jyotiraditya.dmt.ui.theme.Ground
 import dev.jyotiraditya.dmt.ui.theme.Margin
@@ -77,8 +76,8 @@ internal fun LibraryHead(
             modifier
                 .fillMaxWidth()
                 .background(tint ?: Ground)
-                .bottomSeparator()
-                .padding(top = 8.dp),
+                .topSeparator()
+                .padding(vertical = 8.dp),
     ) {
         SearchBox(
             query = state.query,
@@ -86,7 +85,6 @@ internal fun LibraryHead(
             onQuery = { dispatch(DmtAction.Query(it)) },
             modifier = Modifier.padding(horizontal = Margin),
         )
-        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
