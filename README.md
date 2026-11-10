@@ -5,7 +5,7 @@
 
 **Dear music, thanks.** A music player for Android, for the music you own.
 
-> **This is a fork.** d.j maintains this fork of
+> **This is a fork.** dev-1415 maintains this fork of
 > [imjyotiraditya/dmt](https://github.com/imjyotiraditya/dmt). It keeps the original player and
 > adds the changes listed under [What's new in this fork](#whats-new-in-this-fork). The upstream
 > project and its author are credited under [Acknowledgements](#acknowledgements).
