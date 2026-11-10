@@ -1,11 +1,5 @@
 package dev.jyotiraditya.dmt.ui.components
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -23,14 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,18 +38,12 @@ import dev.jyotiraditya.dmt.ui.theme.Surface2
 
 private val ROW_ART = 56.dp
 
-/** The stripe that marks the current track, drawn in the row's leading margin. */
-private val CURRENT_STRIPE = 4.dp
-
-private val INLINE_BARS = 12.dp
-
-/** A track with its cover or number, marking the current one with a stripe, accent and bars. */
+/** A track with its cover or number, marking the current one with an accent box. */
 @Composable
 fun TrackRow(
     track: Track,
     meta: String,
     current: Boolean,
-    playing: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     number: Int? = null,
@@ -73,9 +57,7 @@ fun TrackRow(
         modifier =
             modifier
                 .fillMaxWidth()
-                .drawBehind {
-                    if (current) drawRect(mark, size = Size(CURRENT_STRIPE.toPx(), size.height))
-                }
+                .background(if (current) mark.copy(alpha = 0.14f) else Color.Transparent)
                 .pressable(
                     onClick = onClick,
                     onLongClick = onLongClick,
@@ -89,11 +71,11 @@ fun TrackRow(
                 contentAlignment = Alignment.CenterStart,
                 modifier = Modifier.size(width = 36.dp, height = 44.dp),
             ) {
-                if (current) {
-                    PlayingBars(playing = playing, color = mark)
-                } else {
-                    Text(text = "$number", style = Numerals, color = Muted)
-                }
+                Text(
+                    text = "$number",
+                    style = Numerals,
+                    color = if (current) mark else Muted,
+                )
             }
         } else {
             Artwork(track = track, modifier = Modifier.size(ROW_ART))
@@ -107,16 +89,8 @@ fun TrackRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val barsInline = current && number == null
-            if (meta.isNotEmpty() || metaTrailing != null || barsInline || track.cue) {
+            if (meta.isNotEmpty() || metaTrailing != null || track.cue) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (barsInline) {
-                        PlayingBars(
-                            playing = playing,
-                            color = mark,
-                            modifier = Modifier.padding(end = 6.dp).size(INLINE_BARS),
-                        )
-                    }
                     if (track.cue) {
                         Tag(
                             text = stringResource(R.string.library_cue_tag),
@@ -134,7 +108,7 @@ fun TrackRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier =
                                 if (metaTrailing != null) {
-                                    Modifier.weight(1f, fill = false)
+                                    Modifier.weight(1f)
                                 } else {
                                     Modifier
                                 },
@@ -249,57 +223,6 @@ fun FolderRow(
             }
         }
     }
-}
-
-/** Three bars that bounce while [playing] and rest otherwise. */
-@Composable
-fun PlayingBars(playing: Boolean, modifier: Modifier = Modifier, color: Color = Ink) {
-    if (playing) {
-        BouncingBars(modifier, color)
-    } else {
-        Canvas(modifier = modifier.size(18.dp)) { drawBars(color, 0.45f, 0.8f, 0.6f) }
-    }
-}
-
-/** The bars in motion, read while drawing. */
-@Composable
-private fun BouncingBars(modifier: Modifier, color: Color) {
-    val transition = rememberInfiniteTransition(label = "bars")
-    val a =
-        transition.animateFloat(
-            0.3f,
-            1f,
-            infiniteRepeatable(tween(520), RepeatMode.Reverse),
-            label = "barA",
-        )
-    val b =
-        transition.animateFloat(
-            1f,
-            0.25f,
-            infiniteRepeatable(tween(410), RepeatMode.Reverse),
-            label = "barB",
-        )
-    val c =
-        transition.animateFloat(
-            0.45f,
-            0.9f,
-            infiniteRepeatable(tween(610), RepeatMode.Reverse),
-            label = "barC",
-        )
-    Canvas(modifier = modifier.size(18.dp)) { drawBars(color, a.value, b.value, c.value) }
-}
-
-/** Three bars standing on the bottom edge, each [first], [second] and [third] of the height. */
-private fun DrawScope.drawBars(color: Color, first: Float, second: Float, third: Float) {
-    val barW = size.width / 5f
-    drawBar(color, 0f, barW, first)
-    drawBar(color, barW * 2, barW, second)
-    drawBar(color, barW * 4, barW, third)
-}
-
-private fun DrawScope.drawBar(color: Color, left: Float, width: Float, height: Float) {
-    val barH = size.height * height
-    drawRect(color, topLeft = Offset(left, size.height - barH), size = Size(width, barH))
 }
 
 @Composable

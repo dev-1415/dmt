@@ -26,7 +26,4 @@ internal object PlayerDimens {
     val QueueTarget = 48.dp
 
     val QueueGlyph = 24.dp
-
-    /** Delay before a title too long for one line starts to scroll. */
-    const val MARQUEE_DELAY_MS = 2000
 }

@@ -106,6 +106,8 @@
     <string name="playlist_name_hint">Give it a name</string>
     <string name="playlist_create">Create</string>
     <string name="playlist_add">Add</string>
+    <string name="playlist_move_up">Move up</string>
+    <string name="playlist_move_down">Move down</string>
     <string name="playlist_remove">Remove from playlist</string>
     <string name="playlist_add_tracks_title">Add tracks</string>
     <string name="playlist_pick_title">Add to playlist</string>
@@ -114,6 +116,8 @@
     <string name="playlist_export">Export M3U</string>
     <string name="notice_playlist_imported">Imported %1$s</string>
     <string name="notice_playlist_exported">Exported %1$s</string>
+    <string name="notice_playlist_saved">Saved queue as %1$s</string>
+    <string name="queue_save_playlist">Save as playlist</string>
     <string name="error_playlist_import">Could not import that playlist</string>
     <string name="error_playlist_export">Could not export that playlist</string>
 
@@ -281,6 +285,9 @@
     <string name="settings_singer_colors">Singer colours</string>
     <string name="settings_singer_colors_hint">Give each singer in a duet their own colour, or keep all lyrics white</string>
     <string name="settings_rescan">Rescan library</string>
+    <string name="settings_repair_index">Repair library index</string>
+    <string name="settings_repair_index_hint">Re-indexes every audio file in the library</string>
+    <string name="notice_index_repaired">Re-indexed %1$d files</string>
     <string name="settings_rescan_scanning">Scanning…</string>
     <string name="settings_rescan_up_to_date">Up to date</string>
     <string name="settings_rescan_just_now">just now</string>

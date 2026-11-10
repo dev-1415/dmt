@@ -12,6 +12,7 @@ import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.core.base.BaseViewModel
 import dev.jyotiraditya.dmt.core.common.PermissionChecker
 import dev.jyotiraditya.dmt.core.common.UiText
+import dev.jyotiraditya.dmt.data.library.MediaIndexRepair
 import dev.jyotiraditya.dmt.data.lyrics.LyricsEmbedder
 import dev.jyotiraditya.dmt.data.repository.AnimatedArtworkRepository
 import dev.jyotiraditya.dmt.data.repository.PlaylistRepository
@@ -104,6 +105,12 @@ constructor(
     private var scanJob: Job? = null
     private var filterJob: Job? = null
     private var sessionRestored = false
+
+    /** Whether the app is visible; lyrics and covers are only loaded while it is. */
+    private var foreground = false
+
+    /** A media store change arrived while the app was in the background. */
+    private var scanPending = false
     private val queries = MutableStateFlow("")
 
     init {
@@ -136,7 +143,9 @@ constructor(
         }
         viewModelScope.launch {
             scanLibrary.changes().debounce(LIBRARY_SETTLE).collect {
-                if (currentState.hasPermission) scan()
+                if (!currentState.hasPermission) return@collect
+                // Scanning a large library is expensive; defer it until the app is visible.
+                if (foreground) scan() else scanPending = true
             }
         }
         if (currentState.hasPermission) scan()
@@ -151,6 +160,36 @@ constructor(
         }
     }
 
+    /** Re-indexes every audio file in the library, then reads the library again. */
+    private fun repairIndex() {
+        viewModelScope.launch {
+            reduce { it.copy(scanning = true) }
+            val roots = currentState.library.folderRoots.map { it.path }
+            val repaired = MediaIndexRepair.repair(context, roots)
+            reduce { it.copy(scanning = false) }
+            notify(UiText(R.string.notice_index_repaired, repaired))
+            scan(refresh = true)
+        }
+    }
+
+    /** Saves the tracks currently queued as a new playlist. */
+    private fun saveQueue() {
+        val tracks = currentState.queue.mapNotNull { currentState.library.track(it.mediaId) }
+        if (tracks.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val name = playlistRepository.createFromTracks("Queue", tracks)
+            if (name == null) {
+                reduce { it.copy(error = UiText(R.string.error_playlist_export)) }
+            } else {
+                val playlists = playlistRepository.load(currentState.tracks)
+                reduce { it.copy(playlists = playlists) }
+                withContext(Dispatchers.Main) {
+                    notify(UiText(R.string.notice_playlist_saved, name))
+                }
+            }
+        }
+    }
+
     override fun onIntent(intent: DmtAction) {
         val c = controller
         when (intent) {
@@ -160,6 +199,8 @@ constructor(
             }
 
             DmtAction.Rescan -> scan(refresh = true)
+
+            DmtAction.RepairIndex -> repairIndex()
 
             is DmtAction.Query -> {
                 reduce { it.copy(query = intent.value) }
@@ -211,6 +252,13 @@ constructor(
                 mutatePlaylists {
                     playlistRepository.removeTrack(intent.name, intent.path)
                 }
+
+            is DmtAction.MoveInPlaylist ->
+                mutatePlaylists {
+                    playlistRepository.moveTrack(intent.name, intent.from, intent.to)
+                }
+
+            DmtAction.SaveQueue -> saveQueue()
 
             is DmtAction.ImportPlaylist ->
                 viewModelScope.launch(Dispatchers.IO) {
@@ -484,7 +532,20 @@ constructor(
         }
     }
 
+    /** Tells the view model whether the app is visible, so background playback stays light. */
+    fun setForeground(value: Boolean) {
+        if (foreground == value) return
+        foreground = value
+        if (!value) return
+        loadNowPlaying(controller?.currentMediaItem)
+        if (scanPending) {
+            scanPending = false
+            scan()
+        }
+    }
+
     private fun loadNowPlaying(mediaItem: MediaItem?) {
+        if (!foreground) return
         details.load(mediaItem, controller?.currentTracks?.playedAudioFormat())
         lyrics.load(mediaItem)
     }

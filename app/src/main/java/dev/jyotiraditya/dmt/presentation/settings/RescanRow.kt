@@ -24,7 +24,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.LibraryScan
+import dev.jyotiraditya.dmt.ui.components.DmtIcon
 import dev.jyotiraditya.dmt.ui.components.pressable
+import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
@@ -71,6 +73,36 @@ internal fun RescanRow(
         }
         Spacer(modifier = Modifier.width(16.dp))
         RescanGlyph(scanning = scanning, done = rememberJustFinished(last))
+    }
+}
+
+/** Re-indexes every audio file in the library, for rows MediaStore has lost. */
+@Composable
+internal fun RepairIndexRow(
+    scanning: Boolean,
+    onRepair: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = stringResource(R.string.settings_repair_index)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .pressable(onClick = onRepair, enabled = !scanning, sink = 0.985f, label = label)
+                .padding(horizontal = Margin, vertical = 14.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, style = MaterialTheme.typography.titleMedium, color = Ink)
+            Text(
+                text = stringResource(R.string.settings_repair_index_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        DmtIcon(icon = DmtIcons.Refresh, tint = Muted, size = 20.dp)
     }
 }
 

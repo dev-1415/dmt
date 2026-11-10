@@ -143,6 +143,9 @@ sealed interface DmtAction {
 
     data object Rescan : DmtAction
 
+    /** Re-indexes every audio file in the library, then rescans it. */
+    data object RepairIndex : DmtAction
+
     data class Query(val value: String) : DmtAction
 
     data class Show(val view: DmtView) : DmtAction
@@ -190,6 +193,12 @@ sealed interface DmtAction {
 
     /** Moves the item at player index [from] to index [to]. */
     data class MoveInQueue(val from: Int, val to: Int) : DmtAction
+
+    /** Moves the track at [from] to [to] in the playlist [name]. */
+    data class MoveInPlaylist(val name: String, val from: Int, val to: Int) : DmtAction
+
+    /** Saves the current queue as a playlist. */
+    data object SaveQueue : DmtAction
 
     /** Removes everything queued after the playing track. */
     data object ClearUpcoming : DmtAction

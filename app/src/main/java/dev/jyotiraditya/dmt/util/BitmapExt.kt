@@ -56,6 +56,7 @@ suspend fun Bitmap.fieldColor(): Color = withContext(Dispatchers.Default) {
     val usable = ArrayList<Int>(pixels.size)
     val hsv = FloatArray(3)
     var brightness = 0f
+    var saturationSum = 0f
     for (pixel in pixels) {
         if (PlatformColor.alpha(pixel) < MIN_ALPHA) continue
         PlatformColor.colorToHSV(pixel, hsv)
@@ -64,8 +65,13 @@ suspend fun Bitmap.fieldColor(): Color = withContext(Dispatchers.Default) {
         // Near-white pixels are usually paper or sky, not the cover's colour.
         if (hsv[1] < MIN_SATURATION && hsv[2] > 0.9f) continue
         usable += pixel
+        saturationSum += hsv[1]
     }
     if (usable.size < CLUSTERS) return@withContext neutralField(brightness / pixels.size)
+    // A black-and-white or paper cover can have a faint warm cast; keep it neutral.
+    if (saturationSum / usable.size < 0.20f) {
+        return@withContext neutralField(brightness / pixels.size)
+    }
 
     val centroids = seedCentroids(usable, hsv)
     val sums = Array(CLUSTERS) { FloatArray(3) }
@@ -149,7 +155,8 @@ private fun borderHue(pixels: IntArray, width: Int, height: Int): Float? {
         if (PlatformColor.alpha(pixel) < MIN_ALPHA) return
         PlatformColor.colorToHSV(pixel, hsv)
         if (hsv[2] < MIN_VALUE || hsv[2] > MAX_VALUE) return
-        if (hsv[1] < 0.15f) return
+        // A faint colour cast on a white or grey border is not a real cover colour.
+        if (hsv[1] < 0.25f) return
         val bin = (hsv[0] / 30f).toInt() % 12
         val weight = hsv[1] * hsv[2]
         bins[bin] += weight
@@ -169,7 +176,7 @@ private fun borderHue(pixels: IntArray, width: Int, height: Int): Float? {
     if (counted == 0 || total < 0.5f) return null
     var best = 0
     for (i in 1 until bins.size) if (bins[i] > bins[best]) best = i
-    if (bins[best] / total < 0.25f) return null
+    if (bins[best] / total < 0.35f) return null
     return hueSums[best] / bins[best]
 }
 

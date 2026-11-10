@@ -137,7 +137,6 @@ fun ListenPane(
                             track = track,
                             meta = track.artist.asCredit(),
                             current = track.id.toString() == state.nowPlayingId,
-                            playing = playing,
                             onClick = { dispatch(DmtAction.PlayAt(home.tracks, index)) },
                             onLongClick = { openTrackMenu(track) },
                         )

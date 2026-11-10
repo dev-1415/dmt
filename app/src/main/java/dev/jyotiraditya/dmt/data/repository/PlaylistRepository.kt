@@ -68,6 +68,34 @@ constructor(
         runCatching { file.writeText(kept.joinToString("\n", postfix = "\n")) }
     }
 
+    /** Moves the track at [from] to [to] in the playlist [name]. */
+    fun moveTrack(name: String, from: Int, to: Int) {
+        val file = fileFor(name) ?: return
+        if (!file.exists() || from == to) return
+        val entries = entriesOf(file).toMutableList()
+        if (from !in entries.indices || to !in entries.indices) return
+        entries.add(to, entries.removeAt(from))
+        runCatching { file.writeText(entries.joinToString("\n", postfix = "\n")) }
+    }
+
+    /** Saves [tracks] as a new playlist named [base], returning the name used. */
+    fun createFromTracks(base: String, tracks: List<Track>): String? {
+        if (tracks.isEmpty()) return null
+        val name = uniqueName(base)
+        val file = fileFor(name) ?: return null
+        val written =
+            runCatching {
+                file.writeText(
+                    buildString {
+                        appendLine(M3U_HEADER)
+                        tracks.forEach { appendLine(it.path) }
+                    },
+                )
+            }
+                .isSuccess
+        return if (written) name else null
+    }
+
     /** Reads an M3U/M3U8 file at [uri] and saves its matching [tracks] as a new playlist. */
     fun import(uri: Uri, tracks: List<Track>): Playlist? {
         val entries =

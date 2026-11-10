@@ -28,6 +28,16 @@ class MainActivity : ComponentActivity() {
 
     private val playerViewModel: PlayerViewModel by viewModels()
 
+    override fun onStart() {
+        super.onStart()
+        playerViewModel.setForeground(true)
+    }
+
+    override fun onStop() {
+        playerViewModel.setForeground(false)
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,8 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -55,7 +54,6 @@ import dev.jyotiraditya.dmt.ui.components.ChoiceRow
 import dev.jyotiraditya.dmt.ui.components.DmtIcon
 import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.EmptyState
-import dev.jyotiraditya.dmt.ui.components.PlayingBars
 import dev.jyotiraditya.dmt.ui.components.ScrollBar
 import dev.jyotiraditya.dmt.ui.components.SearchBox
 import dev.jyotiraditya.dmt.ui.components.SheetAction
@@ -227,15 +225,14 @@ private fun LazyListScope.fullQueue(
                     .padding(horizontal = Margin, vertical = 8.dp),
         ) {
             Text(
-                text = stringResource(R.string.nav_queue),
-                style = MaterialTheme.typography.titleMedium,
-                color = Ink,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
                 text = "${displayed.size}",
                 style = MaterialTheme.typography.bodySmall,
                 color = Muted,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            TextLink(
+                label = stringResource(R.string.queue_save_playlist),
+                onClick = { dispatch(DmtAction.SaveQueue) },
             )
             TextLink(
                 label = stringResource(R.string.sort_by, stringResource(sort.label)),
@@ -360,16 +357,18 @@ private fun FullQueueRow(
     handle: (@Composable () -> Unit)?,
 ) {
     val mark = LocalAccent.current.highlight
-    val playing = rememberWantsPlayback()
     val endPadding = if (handle != null) 24.dp else Margin
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
             Modifier.fillMaxWidth()
-                .background(if (raised) Surface2 else Color.Transparent)
-                .drawBehind {
-                    if (current) drawRect(mark, size = Size(4.dp.toPx(), size.height))
-                }
+                .background(
+                    when {
+                        current -> mark.copy(alpha = 0.14f)
+                        raised -> Surface2
+                        else -> Color.Transparent
+                    }
+                )
                 .pressable(
                     onClick = onClick,
                     onLongClick = onLongClick,
@@ -380,13 +379,6 @@ private fun FullQueueRow(
     ) {
         Artwork(track = track, modifier = Modifier.size(RowArt))
         TrackText(entry.title, entry.artist, modifier = Modifier.weight(1f))
-        if (current) {
-            PlayingBars(
-                playing = playing,
-                color = mark,
-                modifier = Modifier.size(18.dp),
-            )
-        }
         handle?.invoke()
     }
 }

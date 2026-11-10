@@ -52,10 +52,18 @@ fun AnimatedCover(url: String, playing: Boolean, modifier: Modifier = Modifier) 
 
     DisposableEffect(player) { onDispose { player.release() } }
 
-    // Stop decoding the looping cover while the app is not in the foreground.
-    LifecycleStartEffect(player, playing) {
+    // Release the looping cover's decoder while the app is not in the foreground.
+    LifecycleStartEffect(player, playing, url) {
+        if (player.mediaItemCount == 0) {
+            player.setMediaItem(MediaItem.fromUri(url))
+            player.prepare()
+        }
         player.playWhenReady = playing
-        onStopOrDispose { player.playWhenReady = false }
+        onStopOrDispose {
+            player.playWhenReady = false
+            player.stop()
+            player.clearMediaItems()
+        }
     }
 
     val presentation = rememberPresentationState(player)

@@ -317,7 +317,6 @@ private fun LazyListScope.tracks(
             track = track,
             meta = trackSummary(track),
             current = track.id.toString() == state.nowPlayingId,
-            playing = playing,
             onClick = { dispatch(DmtAction.PlayAt(state.filtered, index)) },
             onLongClick = { openTrackMenu(track) },
             modifier = Modifier.animateItem(),
@@ -376,7 +375,6 @@ private fun LazyListScope.results(
             track = track,
             meta = trackSummary(track),
             current = track.id.toString() == state.nowPlayingId,
-            playing = playing,
             onClick = {
                 if (view == DmtView.FOLDERS) {
                     dispatch(DmtAction.OpenFolder(track.path.substringBeforeLast('/')))

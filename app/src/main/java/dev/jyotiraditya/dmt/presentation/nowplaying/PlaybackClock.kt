@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.media3.common.Player
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.player.sleepOn
@@ -19,6 +18,9 @@ import kotlin.time.Duration.Companion.minutes
 
 /** Backward corrections smaller than this are ignored to avoid visible jitter. */
 private const val JITTER_MS = 300L
+
+/** Lyrics only need about 20 fps; redrawing them at 120 fps wastes CPU and GPU. */
+private const val POSITION_FRAME_MS = 50L
 
 /**
  * [player]'s position, read every frame while [moving] and on each player event otherwise; [leadMs]
@@ -39,10 +41,9 @@ internal fun rememberPlaybackPosition(
     player.addListener(listener)
     try {
         while (moving) {
-            withFrameMillis {
-                val read = player.currentPosition + leadMs
-                if (read !in value - JITTER_MS..<value) value = read
-            }
+            delay(POSITION_FRAME_MS)
+            val read = player.currentPosition + leadMs
+            if (read !in value - JITTER_MS..<value) value = read
         }
         awaitCancellation()
     } finally {

@@ -130,12 +130,12 @@ internal fun FolderDetail(
                 FolderCover(
                     folder = folder,
                     columns = 4,
-                    rows = 3,
-                    background = tint ?: Ground,
+                    rows = 4,
+                    background = Color.Transparent,
                     modifier =
                         Modifier.padding(horizontal = Margin, vertical = 12.dp)
                             .fillMaxWidth()
-                            .aspectRatio(4f / 3f),
+                            .aspectRatio(1f),
                 )
             }
             stickyHeader {
@@ -270,7 +270,6 @@ internal fun LazyListScope.folderContents(
                 meta = trackCredit(track),
                 metaTrailing = trackMonth(track),
                 current = track.id.toString() == state.nowPlayingId,
-                playing = playing,
                 onClick = { dispatch(DmtAction.PlayAt(tracks, index)) },
                 onLongClick = { openTrackMenu(track) },
                 modifier = Modifier.animateItem(),

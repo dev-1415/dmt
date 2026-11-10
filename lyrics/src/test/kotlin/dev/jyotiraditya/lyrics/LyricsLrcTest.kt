@@ -1,6 +1,7 @@
 package dev.jyotiraditya.lyrics
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LyricsLrcTest {
@@ -70,6 +71,21 @@ class LyricsLrcTest {
         val parsed = LyricsParser.parse(lrc)!!.lines.single()
         assertEquals(listOf(false, true), parsed.words.map { it.background })
         assertEquals(3_000, parsed.words.last().endMs)
+    }
+
+    @Test
+    fun `duet sides survive the round trip`() {
+        val raw = javaClass.getResource("/lyrics/ttml_multivoice.ttml")!!.readText()
+        val lyrics = LyricsParser.parse(raw)!!
+        val lrc = lyrics.toLrc()
+        assertTrue(lrc.contains("v1:"))
+        val parsed = LyricsParser.parse(lrc)!!
+        assertEquals(lyrics.lines.size, parsed.lines.size)
+        lyrics.lines.zip(parsed.lines).forEach { (expected, actual) ->
+            if (expected.voice != Voice.GROUP) {
+                assertEquals(expected.voice, actual.voice)
+            }
+        }
     }
 
     @Test

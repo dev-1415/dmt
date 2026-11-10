@@ -26,7 +26,7 @@ object LrcParser {
 
     /** The lyrics in [raw], or null if no line in it is timed. */
     fun parse(raw: String): Lyrics? {
-        val reader = LrcLineReader()
+        val reader = LrcLineReader(raw.lineSequence().any(String::isUnprefixedVoiceLine))
         raw.lineSequence().forEach(reader::read)
         if (reader.lines.isEmpty()) return null
         return Lyrics(
@@ -51,7 +51,21 @@ private val TRANSLATION_LINE = Regex("""^\[tr:(.*)]$""", RegexOption.IGNORE_CASE
 
 private val VOICE_PREFIX = Regex("""^v(\d+):""")
 
-private class LrcLineReader {
+/** Whether this line is a timed lyric without a `vN:` voice prefix. */
+private fun String.isUnprefixedVoiceLine(): Boolean {
+    val trimmed = trim()
+    if (trimmed.isEmpty() || trimmed.startsWith("[bg:") || trimmed.startsWith("[tr:")) {
+        return false
+    }
+    val stamps = trimmed.leadingTimeTags()
+    if (stamps.isEmpty()) return false
+    val rest = trimmed.substring(stamps.last().end).trimStart()
+    if (!rest.startsWith("v")) return true
+    val number = rest.substringAfter('v').substringBefore(':')
+    return number.isEmpty() || !number.all(Char::isDigit)
+}
+
+private class LrcLineReader(private val hasUnprefixedVoice: Boolean) {
     val lines = mutableListOf<LyricLine>()
 
     /** Singer index by voice number, in the order the voices first appear. */
@@ -80,7 +94,13 @@ private class LrcLineReader {
         val timed = readWordTimes(body)
         if (timed.text.isBlank()) return
 
-        val singer = voice?.let { singers.getOrPut(it) { singers.size } } ?: 0
+        // Unprefixed lines are the first singer, so a v1 line after them is the second.
+        val singer =
+            voice?.let {
+                singers.getOrPut(it) {
+                    if (hasUnprefixedVoice) singers.size + 1 else singers.size
+                }
+            } ?: 0
         val firstStartMs = stamps.first().ms
         stamps.forEach { stamp ->
             val words = timed.words.shiftedTo(stamp.ms, firstStartMs)

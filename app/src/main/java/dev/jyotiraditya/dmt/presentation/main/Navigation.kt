@@ -152,6 +152,7 @@ internal fun BottomBar(
     settingsOpen: Boolean,
     field: Color,
     onPlace: (Place) -> Unit,
+    onLongPlace: (Place) -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -186,6 +187,7 @@ internal fun BottomBar(
                             ink = ink,
                             rest = rest,
                             onClick = { onPlace(p) },
+                            onLongClick = { onLongPlace(p) },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -212,6 +214,7 @@ internal fun BottomBar(
                             ink = ink,
                             rest = rest,
                             onClick = { onPlace(p) },
+                            onLongClick = { onLongPlace(p) },
                         )
                     }
                 }
@@ -275,6 +278,7 @@ private fun BottomTab(
     ink: Color,
     rest: Color,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = stringResource(place.label)
@@ -295,7 +299,10 @@ private fun BottomTab(
                     Modifier.combinedClickable(
                         onClickLabel = label,
                         role = Role.Tab,
-                        onLongClick = { scope.launch { tooltipState.show() } },
+                        onLongClick = {
+                            scope.launch { tooltipState.show() }
+                            onLongClick()
+                        },
                         onClick = onClick,
                     )
                         .padding(horizontal = 10.dp, vertical = 8.dp),

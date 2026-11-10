@@ -349,6 +349,17 @@ fun DmtScreen(
                     settingsOpen = settingsOpen,
                     field = field,
                     onPlace = openPlace,
+                    onLongPlace = { place ->
+                        if (place == Place.FOLDERS) {
+                            state.nowPlayingTrack?.let { track ->
+                                go(Place.FOLDERS)
+                                dispatch(
+                                    DmtAction.OpenFolder(track.path.substringBeforeLast('/')),
+                                )
+                                dispatch(DmtAction.ScrollToTrack(track.id.toString()))
+                            }
+                        }
+                    },
                     onSettings = {
                         if (settingsOpen) closeSettings() else openSettings()
                     },

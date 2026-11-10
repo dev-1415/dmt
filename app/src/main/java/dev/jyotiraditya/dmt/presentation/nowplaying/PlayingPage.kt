@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.MaterialTheme
@@ -41,8 +41,10 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.state.rememberPlayPauseButtonState
@@ -125,7 +127,7 @@ internal fun PlayingPage(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    TrackTitle(state, ink, dim, active, onOpenArtist)
+                    TrackTitle(state, ink, dim, onOpenArtist)
                 }
             },
             seek = { SeekRow(state, player, field, ink, dim) },
@@ -220,13 +222,12 @@ private fun SeekReadout(player: Player, stepMs: Long, modifier: Modifier = Modif
     )
 }
 
-/** Title and credit on one line each; a long title scrolls so the layout never shifts. */
+/** Title and credit on one line each; a long title is ellipsized instead of scrolling. */
 @Composable
 private fun TrackTitle(
     state: DmtState,
     ink: Color,
     dim: Color,
-    active: Boolean,
     onOpenArtist: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -246,13 +247,16 @@ private fun TrackTitle(
                 text = title,
                 style = MaterialTheme.typography.headlineMedium,
                 color = ink,
+                fontWeight = FontWeight.Normal,
                 maxLines = 1,
-                modifier =
-                    Modifier.fillMaxWidth()
-                        .basicMarquee(
-                            iterations = if (active) Int.MAX_VALUE else 0,
-                            initialDelayMillis = PlayerDimens.MARQUEE_DELAY_MS,
-                        ),
+                overflow = TextOverflow.Ellipsis,
+                autoSize =
+                    TextAutoSize.StepBased(
+                        minFontSize = 14.sp,
+                        maxFontSize = 28.sp,
+                        stepSize = 1.sp,
+                    ),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
         Text(

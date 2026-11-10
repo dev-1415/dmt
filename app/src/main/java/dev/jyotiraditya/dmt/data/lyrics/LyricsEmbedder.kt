@@ -1,5 +1,6 @@
 package dev.jyotiraditya.dmt.data.lyrics
 
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -12,7 +13,6 @@ import dev.jyotiraditya.dmt.BuildConfig
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.model.TrackSource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -25,6 +25,7 @@ import org.jaudiotagger.audio.opus.OpusFileWriter
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.Tag
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import kotlin.coroutines.resume
 
@@ -66,7 +67,6 @@ object LyricsEmbedder {
                 // The destination is the rewritten file that replaces the original.
                 val destination = File(file.parentFile, ".dmt-dest-${System.nanoTime()}.$format")
                 var sourceReady = false
-                var originalDeleted = false
                 try {
                     file.copyTo(source, overwrite = true)
                     if (modified > 0L) source.setLastModified(modified)
@@ -75,15 +75,12 @@ object LyricsEmbedder {
                     require(destination.isFile && headerMatches(destination, format)) {
                         "The rewritten file is not readable"
                     }
-                    // Replace the original only after the new file has been verified. A rename
-                    // over the original is atomic; deleting first is only the fallback.
-                    if (!destination.renameTo(file)) {
-                        originalDeleted = deleteWithRetry(file)
-                        require(originalDeleted) { "Could not replace the file" }
-                        require(renameWithRetry(destination, file)) {
-                            "Could not replace the file"
-                        }
+                    // Overwrite the original in place. Renaming a new file over it makes
+                    // MediaStore drop the row, which is what made tracks disappear.
+                    FileOutputStream(file).use { output ->
+                        destination.inputStream().use { input -> input.copyTo(output) }
                     }
+                    destination.delete()
                     runCatching { if (modified > 0L) file.setLastModified(modified) }
                     source.delete()
                     // The scan may lose tags for some formats, so the refresh puts them back.
@@ -111,10 +108,10 @@ object LyricsEmbedder {
                         folder = file.parentFile,
                     )
                     destination.delete()
-                    // Put the original back if it was already removed. Keep the source copy if
-                    // the restore fails, so the file can still be recovered by hand.
-                    var restored = !originalDeleted
-                    if (sourceReady && originalDeleted) {
+                    // Put the original back. Keep the source copy if the restore fails, so the
+                    // file can still be recovered by hand.
+                    var restored = !sourceReady
+                    if (sourceReady) {
                         restored =
                             runCatching {
                                 source.copyTo(file, overwrite = true)
@@ -222,23 +219,6 @@ object LyricsEmbedder {
         }
     }
 
-    private suspend fun deleteWithRetry(file: File): Boolean {
-        repeat(10) {
-            if (file.delete()) return true
-            if (!file.exists()) return true
-            delay(100)
-        }
-        return !file.exists()
-    }
-
-    private suspend fun renameWithRetry(source: File, target: File): Boolean {
-        repeat(10) {
-            if (source.renameTo(target)) return true
-            delay(100)
-        }
-        return false
-    }
-
     private fun headerHex(file: File): String {
         val bytes = ByteArray(16)
         val read = file.inputStream().use { it.read(bytes) }
@@ -336,6 +316,7 @@ object LyricsEmbedder {
         }
         // Replacing the file can remove its row. Ask the media store to index it again.
         val scannedUri = scanFile(context, file)
+        if (scannedUri == null) Log.e(TAG, "scan_file failed for ${file.name}")
         EmbedLog.write(
             context,
             "scan_file ${file.name} -> $scannedUri",
@@ -366,6 +347,7 @@ object LyricsEmbedder {
             }
         if (scanned == null) {
             val inserted = insertMediaStore(context, file, track, tag, modified)
+            if (inserted == null) Log.e(TAG, "insert failed for ${file.name}")
             EmbedLog.write(
                 context,
                 "insert ${file.name} -> $inserted",
@@ -427,10 +409,24 @@ object LyricsEmbedder {
     /** Asks the media provider to index [file] again, returning its new row if it did. */
     @Suppress("DEPRECATION")
     private fun scanFile(context: Context, file: File): Uri? {
+        // The public scanFile API exists on Android 10+ but is hidden from the compile SDK.
+        val reflected =
+            runCatching {
+                val method =
+                    MediaStore::class.java.getMethod(
+                        "scanFile",
+                        ContentResolver::class.java,
+                        File::class.java,
+                    )
+                method.invoke(null, context.contentResolver, file) as? Uri
+            }.getOrNull()
+        if (reflected != null) return reflected
+
+        val volume = MediaStore.AUTHORITY_URI.buildUpon().appendPath("external").build()
         val result =
             runCatching {
                 context.contentResolver.call(
-                    MediaStore.AUTHORITY_URI,
+                    volume,
                     "scan_file",
                     file.absolutePath,
                     null,

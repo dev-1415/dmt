@@ -191,7 +191,6 @@ internal fun TracksDetail(
                         trackSummary(track)
                     },
                 current = track.id.toString() == state.nowPlayingId,
-                playing = playing,
                 number =
                     if (numbered) {
                         (track.trackNumber.takeIf { it > 0 } ?: (index + 1))
