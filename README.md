@@ -12,24 +12,18 @@
 
 <table>
   <tr>
-    <td width="50%"><img src=".github/screenshots/player.jpg" alt="Now Playing" /></td>
-    <td width="50%"><img src=".github/screenshots/lyrics.jpg" alt="Lyrics on the Now Playing screen" /></td>
+    <td width="20%"><img src=".github/screenshots/player.jpg" alt="Now Playing" /></td>
+    <td width="20%"><img src=".github/screenshots/lyrics.jpg" alt="Lyrics on the Now Playing screen" /></td>
+    <td width="20%"><img src=".github/screenshots/queue.jpg" alt="Up next" /></td>
+    <td width="20%"><img src=".github/screenshots/lyrics-source.jpg" alt="Lyrics source" /></td>
+    <td width="20%"><img src=".github/screenshots/folder.jpg" alt="A folder and its sort" /></td>
   </tr>
   <tr>
-    <td width="50%"><img src=".github/screenshots/queue.jpg" alt="Up next" /></td>
-    <td width="50%"><img src=".github/screenshots/lyrics-source.jpg" alt="Lyrics source" /></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src=".github/screenshots/folder.jpg" alt="A folder and its sort" /></td>
-    <td width="50%"><img src=".github/screenshots/sort.jpg" alt="Sort tracks by" /></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src=".github/screenshots/playlists.jpg" alt="Playlists" /></td>
-    <td width="50%"><img src=".github/screenshots/playlist-actions.jpg" alt="Playlist actions" /></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src=".github/screenshots/settings.jpg" alt="Settings" /></td>
-    <td width="50%"><img src=".github/screenshots/library-tabs.jpg" alt="Library tabs" /></td>
+    <td width="20%"><img src=".github/screenshots/sort.jpg" alt="Sort tracks by" /></td>
+    <td width="20%"><img src=".github/screenshots/playlists.jpg" alt="Playlists" /></td>
+    <td width="20%"><img src=".github/screenshots/playlist-actions.jpg" alt="Playlist actions" /></td>
+    <td width="20%"><img src=".github/screenshots/settings.jpg" alt="Settings" /></td>
+    <td width="20%"><img src=".github/screenshots/library-tabs.jpg" alt="Library tabs" /></td>
   </tr>
 </table>
 
