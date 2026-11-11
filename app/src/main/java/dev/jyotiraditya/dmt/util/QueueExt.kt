@@ -15,6 +15,13 @@ fun Player.enqueue(tracks: List<Track>) {
 }
 
 fun Player.playNext(tracks: List<Track>) {
+    val ids = tracks.mapTo(HashSet()) { it.id.toString() }
+    val current = currentMediaItemIndex
+    // Move the track instead of duplicating it: drop any copy already in the queue.
+    for (i in mediaItemCount - 1 downTo 0) {
+        if (i == current) continue
+        if (getMediaItemAt(i).mediaId in ids) removeMediaItem(i)
+    }
     val at = if (mediaItemCount == 0) 0 else currentMediaItemIndex + 1
     addMediaItems(at, tracks.map { it.toQueueRequest() })
     prepare()

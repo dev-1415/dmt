@@ -116,6 +116,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.jaudiotagger)
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.reorderable)
     baselineProfile(project(":baselineprofile"))
     ksp(libs.hilt.compiler)
     implementation(project(":library"))

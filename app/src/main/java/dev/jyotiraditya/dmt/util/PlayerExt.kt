@@ -93,8 +93,17 @@ fun Player.cycleRepeat() {
 fun Map<String, List<String>>.tag(name: String): String? =
     entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value?.firstOrNull()
 
-/** A queued item; [index] is its place in the player's item list, not the play order. */
-data class QueueEntry(val index: Int, val mediaId: String, val title: String, val artist: String)
+/**
+ * A queued item; [index] is its place in the player's item list, not the play order. [key] stays
+ * the same when the item moves, so the list can animate instead of rebuilding every row.
+ */
+data class QueueEntry(
+    val index: Int,
+    val mediaId: String,
+    val title: String,
+    val artist: String,
+    val key: String,
+)
 
 /** The queue in play order, following shuffle. */
 fun Player.queueEntries(): List<QueueEntry> {
@@ -102,6 +111,7 @@ fun Player.queueEntries(): List<QueueEntry> {
     if (timeline.isEmpty) return emptyList()
 
     val window = Timeline.Window()
+    val seen = HashMap<String, Int>()
 
     return buildList {
         var index = timeline.getFirstWindowIndex(shuffleModeEnabled)
@@ -110,12 +120,16 @@ fun Player.queueEntries(): List<QueueEntry> {
             timeline.getWindow(index, window)
 
             val item = window.mediaItem
+            val mediaId = item.mediaId
+            val occurrence = seen.getOrDefault(mediaId, 0)
+            seen[mediaId] = occurrence + 1
             add(
                 QueueEntry(
                     index = index,
-                    mediaId = item.mediaId,
+                    mediaId = mediaId,
                     title = item.mediaMetadata.title?.toString().orEmpty(),
                     artist = item.mediaMetadata.artist?.toString().orEmpty().asCredit(),
+                    key = "$mediaId#$occurrence",
                 ),
             )
 

@@ -3,7 +3,6 @@ package dev.jyotiraditya.dmt.presentation.nowplaying
 import androidx.annotation.OptIn
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,8 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
@@ -25,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,16 +30,16 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.state.rememberShuffleButtonState
 import dev.jyotiraditya.dmt.R
+import kotlinx.coroutines.delay
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.jyotiraditya.dmt.domain.model.LibrarySnapshot
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.presentation.main.LocalContentBottom
@@ -59,6 +55,7 @@ import dev.jyotiraditya.dmt.ui.components.SearchBox
 import dev.jyotiraditya.dmt.ui.components.SheetAction
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.TextLink
+import dev.jyotiraditya.dmt.ui.components.bottomSeparator
 import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.components.topSeparator
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
@@ -68,6 +65,7 @@ import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.Surface2
 import dev.jyotiraditya.dmt.util.QueueEntry
+import dev.jyotiraditya.dmt.util.queueEntries
 
 private val RowArt = 44.dp
 
@@ -115,7 +113,8 @@ internal fun QueuePage(
         )
     }
     val shuffled = player?.let { rememberShuffleButtonState(it).shuffleOn } ?: false
-    val currentIndex = state.queue.getOrNull(state.queuePosition)?.index
+    val currentEntry = state.queue.getOrNull(state.queuePosition)
+    val currentKey = currentEntry?.key
     val filtered =
         remember(state.queue, state.library, query, sort, shuffled) {
             val base =
@@ -142,13 +141,46 @@ internal fun QueuePage(
         return
     }
     val listState = rememberLazyListState()
-    val reorderable = !shuffled && sort == QueueSort.QUEUE
-    val order = remember(filtered) { filtered.toMutableStateList() }
+    val reorderable = !shuffled && sort == QueueSort.QUEUE && query.isBlank()
+    val order = remember { filtered.toMutableStateList() }
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var justDropped by remember { mutableStateOf(false) }
+    val reorderState =
+        rememberReorderableLazyListState(listState) { from, to ->
+            if (from.index in order.indices && to.index in order.indices) {
+                order.add(to.index, order.removeAt(from.index))
+            }
+        }
+    LaunchedEffect(filtered) {
+        if (!reorderState.isAnyItemDragging && !justDropped) {
+            syncOrder(order, filtered)
+        }
+    }
+    LaunchedEffect(reorderState.isAnyItemDragging) {
+        if (!reorderState.isAnyItemDragging) {
+            // Let the player queue catch up with the last drop before syncing, so the local
+            // order is never replaced by a stale queue snapshot.
+            var waited = 0
+            while (justDropped && waited < 1000) {
+                val entries = player?.queueEntries()
+                if (
+                    entries != null &&
+                    entries.size == order.size &&
+                    entries.indices.all { entries[it].key == order[it].key }
+                ) {
+                    break
+                }
+                delay(50)
+                waited += 50
+            }
+            justDropped = false
+            syncOrder(order, filtered)
+        }
+    }
     val displayed = if (reorderable) order else filtered
-    val drag = remember { DragState(listState) }
     LaunchedEffect(scrollToCurrent, displayed) {
         if (!scrollToCurrent) return@LaunchedEffect
-        val position = displayed.indexOfFirst { it.index == currentIndex }
+        val position = displayed.indexOfFirst { it.key == currentKey }
         if (position < 0) {
             if (query.isNotEmpty()) {
                 query = ""
@@ -157,29 +189,93 @@ internal fun QueuePage(
             }
             return@LaunchedEffect
         }
-        // The heading is the list's first item.
-        listState.animateScrollToItem(position + 1)
+        listState.animateScrollToItem(position)
         onScrolledToCurrent()
     }
     Column(modifier = Modifier.fillMaxSize().background(tint)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .bottomSeparator()
+                    .padding(horizontal = Margin, vertical = 4.dp),
+        ) {
+            Text(
+                text = "${displayed.size}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            TextLink(
+                label = stringResource(R.string.queue_save_playlist),
+                onClick = { dispatch(DmtAction.SaveQueue) },
+                compact = true,
+            )
+            TextLink(
+                label = stringResource(R.string.sort_by, stringResource(sort.label)),
+                onClick = { sorting = true },
+                compact = true,
+            )
+        }
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(bottom = LocalContentBottom.current),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                fullQueue(
-                    state = state,
-                    dispatch = dispatch,
-                    displayed = displayed,
-                    currentIndex = currentIndex,
-                    sort = sort,
-                    onSort = { sorting = true },
-                    onMenu = { menuFor = it },
-                    reorderable = reorderable,
-                    drag = drag,
-                    order = order,
-                )
+                items(displayed, key = { it.key }) { entry ->
+                    ReorderableItem(reorderState, key = entry.key) { isDragging ->
+                        FullQueueRow(
+                            entry = entry,
+                            track = state.library.track(entry.mediaId),
+                            current = entry.key == currentKey,
+                            raised = isDragging,
+                            onClick = { dispatch(DmtAction.Jump(entry.index)) },
+                            onLongClick = { menuFor = entry },
+                            handle =
+                                if (reorderable) {
+                                    {
+                                        DragHandle(
+                                            modifier =
+                                                Modifier.draggableHandle(
+                                                    onDragStarted = { dragKey = entry.key },
+                                                    onDragStopped = {
+                                                        justDropped = true
+                                                        val key = dragKey
+                                                        if (key != null && player != null) {
+                                                            // Resolve the move against the player's
+                                                            // current queue, not indices captured
+                                                            // while the list was scrolling.
+                                                            val entries = player.queueEntries()
+                                                            val from =
+                                                                entries
+                                                                    .firstOrNull { it.key == key }
+                                                                    ?.index
+                                                            val finalPos =
+                                                                order.indexOfFirst { it.key == key }
+                                                            val to = entries.getOrNull(finalPos)?.index
+                                                            if (
+                                                                from != null &&
+                                                                to != null &&
+                                                                from != to
+                                                            ) {
+                                                                dispatch(
+                                                                    DmtAction.MoveInQueue(from, to),
+                                                                )
+                                                            }
+                                                        }
+                                                        dragKey = null
+                                                    },
+                                                ),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                        )
+                    }
+                }
             }
             ScrollBar(
                 state = listState,
@@ -198,74 +294,7 @@ internal fun QueuePage(
                 hint = stringResource(R.string.queue_search_hint),
                 onQuery = { query = it },
                 modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-/** The queue heading and rows, shared by the queue page. */
-private fun LazyListScope.fullQueue(
-    state: DmtState,
-    dispatch: (DmtAction) -> Unit,
-    displayed: List<QueueEntry>,
-    currentIndex: Int?,
-    sort: QueueSort,
-    onSort: () -> Unit,
-    onMenu: (QueueEntry) -> Unit,
-    reorderable: Boolean,
-    drag: DragState,
-    order: MutableList<QueueEntry>,
-) {
-    item(key = "queue-head") {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier =
-                Modifier.fillMaxWidth()
-                    .padding(horizontal = Margin, vertical = 8.dp),
-        ) {
-            Text(
-                text = "${displayed.size}",
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            TextLink(
-                label = stringResource(R.string.queue_save_playlist),
-                onClick = { dispatch(DmtAction.SaveQueue) },
-            )
-            TextLink(
-                label = stringResource(R.string.sort_by, stringResource(sort.label)),
-                onClick = onSort,
-            )
-        }
-    }
-    items(displayed, key = { it.index }) { entry ->
-        val dragging = drag.key == entry.index
-        Box(
-            modifier =
-                Modifier.then(if (dragging) Modifier.zIndex(1f) else Modifier.animateItem())
-                    .graphicsLayer { translationY = if (dragging) drag.offset else 0f },
-        ) {
-            FullQueueRow(
-                entry = entry,
-                track = state.library.track(entry.mediaId),
-                current = entry.index == currentIndex,
-                raised = dragging,
-                onClick = { dispatch(DmtAction.Jump(entry.index)) },
-                onLongClick = { onMenu(entry) },
-                handle =
-                    if (reorderable) {
-                        {
-                            DragHandle(
-                                Modifier.reorderDrag(entry.index, drag, order) { from, to ->
-                                    dispatch(DmtAction.MoveInQueue(from, to))
-                                },
-                            )
-                        }
-                    } else {
-                        null
-                    },
+                height = 40.dp,
             )
         }
     }
@@ -369,16 +398,22 @@ private fun FullQueueRow(
                         else -> Color.Transparent
                     }
                 )
-                .pressable(
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                    sink = 0.985f,
-                    label = entry.title,
-                )
                 .padding(start = Margin, top = 8.dp, bottom = 8.dp, end = endPadding),
     ) {
-        Artwork(track = track, modifier = Modifier.size(RowArt))
-        TrackText(entry.title, entry.artist, modifier = Modifier.weight(1f))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier.weight(1f)
+                    .pressable(
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                        sink = 0.985f,
+                        label = entry.title,
+                    ),
+        ) {
+            Artwork(track = track, modifier = Modifier.size(RowArt))
+            TrackText(entry.title, entry.artist, modifier = Modifier.weight(1f))
+        }
         handle?.invoke()
     }
 }
@@ -394,73 +429,13 @@ private fun DragHandle(modifier: Modifier = Modifier) {
     }
 }
 
-/** Drags row [key] through [order], then reports its player index and new place to [onMove]. */
-private fun Modifier.reorderDrag(
-    key: Int,
-    drag: DragState,
-    order: MutableList<QueueEntry>,
-    onMove: (from: Int, to: Int) -> Unit,
-): Modifier = pointerInput(key) {
-    detectDragGestures(
-        onDragStart = { drag.start(key) },
-        onDrag = { change, amount ->
-            change.consume()
-            drag.by(amount.y, order)
-        },
-        onDragEnd = { drag.finish(order)?.let { (from, to) -> onMove(from, to) } },
-        onDragCancel = { drag.cancel() },
-    )
-}
-
-/** The row being dragged, how far it has moved, and where it started. */
-private class DragState(private val listState: LazyListState) {
-    var key by mutableStateOf<Int?>(null)
-        private set
-
-    var offset by mutableFloatStateOf(0f)
-        private set
-
-    private var startPosition = -1
-
-    fun start(key: Int) {
-        this.key = key
-        offset = 0f
-        startPosition =
-            listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.index ?: -1
-    }
-
-    /** Moves the dragged row by [dy], swapping it with the row its centre passes over. */
-    fun by(dy: Float, order: MutableList<QueueEntry>) {
-        val dragged = key ?: return
-        offset += dy
-        val items = listState.layoutInfo.visibleItemsInfo
-        val info = items.firstOrNull { it.key == dragged } ?: return
-        val centre = info.offset + info.size / 2f + offset
-        val target =
-            items.firstOrNull {
-                it.key != dragged && centre.toInt() in it.offset until it.offset + it.size
-            } ?: return
-        val from = order.indexOfFirst { it.index == dragged }
-        val to = order.indexOfFirst { it.index == target.key }
-        if (from < 0 || to < 0) return
-        order.add(to, order.removeAt(from))
-        // The row now sits where the target was; keep it under the finger.
-        offset -= target.offset - info.offset
-    }
-
-    /** Ends the drag, returning the row's player index and new place if it moved. */
-    fun finish(order: List<QueueEntry>): Pair<Int, Int>? {
-        val dragged = key ?: return null
-        val to = order.indexOfFirst { it.index == dragged }
-        val moved = to >= 0 && to != startPosition
-        cancel()
-        return if (moved) dragged to to else null
-    }
-
-    fun cancel() {
-        key = null
-        offset = 0f
-        startPosition = -1
+/** Updates [order] to [source] without replacing items whose stable key is unchanged. */
+private fun syncOrder(order: MutableList<QueueEntry>, source: List<QueueEntry>) {
+    if (order.size == source.size && order.indices.all { order[it].key == source[it].key }) {
+        for (i in order.indices) order[i] = source[i]
+    } else {
+        order.clear()
+        order.addAll(source)
     }
 }
 

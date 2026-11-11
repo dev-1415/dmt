@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.Folder
@@ -232,13 +233,14 @@ fun SearchBox(
     onQuery: (String) -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
+    height: Dp = 48.dp,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(height)
                 .background(Surface)
                 .border(1.dp, Muted.copy(alpha = 0.5f))
                 .padding(start = 16.dp, end = 4.dp),

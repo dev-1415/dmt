@@ -65,6 +65,7 @@ fun TextLink(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     color: Color = Ink,
+    compact: Boolean = false,
 ) {
     Text(
         text = label,
@@ -73,9 +74,9 @@ fun TextLink(
         maxLines = 1,
         modifier =
             modifier
-                .heightIn(min = 48.dp)
+                .heightIn(min = if (compact) 36.dp else 48.dp)
                 .pressable(onClick = onClick, label = label)
-                .padding(vertical = 14.dp),
+                .padding(vertical = if (compact) 8.dp else 14.dp),
     )
 }
 

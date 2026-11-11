@@ -180,7 +180,10 @@ private fun borderHue(pixels: IntArray, width: Int, height: Int): Float? {
     return hueSums[best] / bins[best]
 }
 
-/** Hues that keep the page tint varied but always readable. */
+/**
+ * Hues that keep the page tint varied but always readable. The warm range is deliberately dense:
+ * a beige or amber cover must not snap to yellow, which would turn the page olive.
+ */
 private val PresetHues =
     floatArrayOf(
         0f,
@@ -198,8 +201,12 @@ private val PresetHues =
         140f,
         120f,
         65f,
+        60f,
         55f,
         45f,
+        35f,
+        30f,
+        20f,
     )
 
 /** The preset tint nearest [hue], or a neutral when the cover has little colour. */
@@ -209,7 +216,7 @@ private fun presetTint(hue: Float, chroma: Float, population: Float): Color {
     // Greens and yellows need more saturation so they read as their hue, not olive.
     val saturation =
         when {
-            nearest in 40f..70f -> 0.72f
+            nearest in 40f..70f -> 0.65f
             nearest in 100f..160f -> 0.68f
             else -> 0.55f
         }

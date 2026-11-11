@@ -45,6 +45,7 @@ import dev.jyotiraditya.dmt.util.suspendRunCatching
 import dev.jyotiraditya.dmt.util.toQueueRequest
 import dev.jyotiraditya.lyrics.toLrc
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -53,7 +54,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,7 +67,7 @@ import kotlin.time.Duration.Companion.seconds
 
 private val LIBRARY_SETTLE = 500.milliseconds
 
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PlayerViewModel
 @Inject
@@ -109,8 +112,11 @@ constructor(
     /** Whether the app is visible; lyrics and covers are only loaded while it is. */
     private var foreground = false
 
-    /** A media store change arrived while the app was in the background. */
-    private var scanPending = false
+    /** Drives the observers that should only run while the app is visible. */
+    private val foregroundFlow = MutableStateFlow(false)
+
+    /** Whether the app has been in the background since it was last visible. */
+    private var wasBackgrounded = false
     private val queries = MutableStateFlow("")
 
     init {
@@ -129,10 +135,17 @@ constructor(
             }
         }
         viewModelScope.launch {
-            trackMediaRepository
-                .routeSpecs()
-                .distinctUntilChanged()
-                .flowOn(Dispatchers.IO)
+            foregroundFlow
+                .flatMapLatest { active ->
+                    if (active) {
+                        trackMediaRepository
+                            .routeSpecs()
+                            .distinctUntilChanged()
+                            .flowOn(Dispatchers.IO)
+                    } else {
+                        emptyFlow()
+                    }
+                }
                 .collect { route -> reduce { it.copy(route = route) } }
         }
         viewModelScope.launch {
@@ -142,11 +155,13 @@ constructor(
                 .collect { refilter() }
         }
         viewModelScope.launch {
-            scanLibrary.changes().debounce(LIBRARY_SETTLE).collect {
-                if (!currentState.hasPermission) return@collect
-                // Scanning a large library is expensive; defer it until the app is visible.
-                if (foreground) scan() else scanPending = true
-            }
+            foregroundFlow
+                .flatMapLatest { active ->
+                    if (active) scanLibrary.changes().debounce(LIBRARY_SETTLE) else emptyFlow()
+                }
+                .collect {
+                    if (currentState.hasPermission) scan()
+                }
         }
         if (currentState.hasPermission) scan()
         connect()
@@ -536,11 +551,15 @@ constructor(
     fun setForeground(value: Boolean) {
         if (foreground == value) return
         foreground = value
-        if (!value) return
+        foregroundFlow.value = value
+        if (!value) {
+            wasBackgrounded = true
+            return
+        }
         loadNowPlaying(controller?.currentMediaItem)
-        if (scanPending) {
-            scanPending = false
-            scan()
+        if (wasBackgrounded) {
+            wasBackgrounded = false
+            if (currentState.hasPermission) scan(refresh = true)
         }
     }
 
