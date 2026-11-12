@@ -17,7 +17,6 @@ jobs:
       SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
       SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
       SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     steps:
       - name: checkout
         uses: actions/checkout@v7
@@ -66,10 +65,3 @@ jobs:
           name: dmt-release
           path: app/build/outputs/apk/release/*.apk
           retention-days: 14
-
-      - name: upload apks to telegram
-        if: github.event_name != 'pull_request' && env.TELEGRAM_BOT_TOKEN != ''
-        continue-on-error: true
-        env:
-          VERSION_NAME: ${{ steps.version.outputs.name }}
-        run: ./scripts/upload-telegram.sh app/build/outputs/apk/release/*.apk
