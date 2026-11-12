@@ -33,8 +33,13 @@ internal data class LyricColors(
     fun passed(color: Color): Color = color.copy(alpha = PASSED_ALPHA).compositeOver(background)
 
     companion object {
-        fun on(ink: Color, background: Color, bySinger: Boolean) = LyricColors(
-            lead = ink,
+        fun on(
+            ink: Color,
+            background: Color,
+            bySinger: Boolean,
+            lead: Color = ink,
+        ) = LyricColors(
+            lead = lead,
             unsung = ink.copy(alpha = UNSUNG_ALPHA).compositeOver(background),
             backing = ink.copy(alpha = BACKING_ALPHA).compositeOver(background),
             group = Color(0xFFE9DFC9),

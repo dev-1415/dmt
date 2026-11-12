@@ -1,11 +1,19 @@
 package dev.jyotiraditya.dmt.presentation.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,7 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
@@ -32,10 +42,14 @@ import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.player.DmtView
 import dev.jyotiraditya.dmt.ui.components.ChoiceRow
+import dev.jyotiraditya.dmt.ui.components.DmtIcon
 import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.PageHead
 import dev.jyotiraditya.dmt.ui.components.ScrollMemory
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
+import dev.jyotiraditya.dmt.ui.components.Toggle
+import dev.jyotiraditya.dmt.ui.components.pressable
+import dev.jyotiraditya.dmt.ui.components.pressableToggle
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.motion.Depth
 import dev.jyotiraditya.dmt.ui.theme.Ink
@@ -397,18 +411,93 @@ private fun LibraryTabsPage(state: DmtState, dispatch: (DmtAction) -> Unit) {
                 modifier = Modifier.padding(start = Margin, end = Margin, bottom = 12.dp),
             )
         }
-        items(LibraryTab.entries, key = { it.name }) { tab ->
-            ToggleRow(
-                label = stringResource(tab.labelRes()),
-                hint = stringResource(tab.hintRes()),
+        val order = settings.libraryTabOrder
+        itemsIndexed(order, key = { _, tab -> tab.name }) { index, tab ->
+            LibraryTabRow(
+                tab = tab,
                 checked = tab in settings.visibleLibraryTabs,
+                canUp = index > 0,
+                canDown = index < order.lastIndex,
                 onToggle = {
                     val visible = settings.visibleLibraryTabs
                     val next = if (tab in visible) visible - tab else visible + tab
                     dispatch(DmtAction.Config(settings.copy(visibleLibraryTabs = next)))
                 },
+                onUp = {
+                    val next = order.toMutableList().apply { add(index - 1, removeAt(index)) }
+                    dispatch(DmtAction.Config(settings.copy(libraryTabOrder = next)))
+                },
+                onDown = {
+                    val next = order.toMutableList().apply { add(index + 1, removeAt(index)) }
+                    dispatch(DmtAction.Config(settings.copy(libraryTabOrder = next)))
+                },
             )
         }
+    }
+}
+
+/** One library tab: its visibility switch and the buttons that move it in the bar. */
+@Composable
+private fun LibraryTabRow(
+    tab: LibraryTab,
+    checked: Boolean,
+    canUp: Boolean,
+    canDown: Boolean,
+    onToggle: () -> Unit,
+    onUp: () -> Unit,
+    onDown: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Margin, vertical = 10.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(tab.labelRes()),
+                style = MaterialTheme.typography.titleMedium,
+                color = Ink,
+            )
+            Text(
+                text = stringResource(tab.hintRes()),
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        LibraryTabMoveButton(up = true, enabled = canUp, onClick = onUp)
+        LibraryTabMoveButton(up = false, enabled = canDown, onClick = onDown)
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier =
+                Modifier.pressableToggle(value = checked, onValueChange = { onToggle() }),
+        ) {
+            Toggle(checked = checked)
+        }
+    }
+}
+
+@Composable
+private fun LibraryTabMoveButton(up: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val description =
+        stringResource(if (up) R.string.playlist_move_up else R.string.playlist_move_down)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            Modifier.size(36.dp)
+                .then(
+                    if (enabled) {
+                        Modifier.pressable(onClick = onClick, label = description)
+                    } else {
+                        Modifier
+                    },
+                ),
+    ) {
+        DmtIcon(
+            icon = DmtIcons.ChevronDown,
+            tint = if (enabled) Muted else Muted.copy(alpha = 0.3f),
+            modifier = if (up) Modifier.rotate(180f) else Modifier,
+            description = description,
+        )
     }
 }
 

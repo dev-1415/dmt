@@ -171,9 +171,9 @@ internal class PlaybackLibraryCallback(
         startIndex: Int,
         startPositionMs: Long,
     ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
-        resolveQueue(controller, mediaItems, startIndex, startPositionMs).also {
-            onQueueReplaced()
-        }
+        val result = resolveQueue(controller, mediaItems, startIndex, startPositionMs)
+        mediaSession.player.applyOffloadPolicy(result.mediaItems.getOrNull(result.startIndex))
+        result.also { onQueueReplaced() }
     }
 
     private suspend fun resolveQueue(

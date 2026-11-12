@@ -1,6 +1,8 @@
 package dev.jyotiraditya.dmt.ui.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,10 +23,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.ui.theme.Dark
 import dev.jyotiraditya.dmt.ui.theme.Ink
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import kotlinx.coroutines.launch
@@ -64,14 +68,20 @@ fun DmtSheet(
         sheetState = state,
         sheetGesturesEnabled = gesturesEnabled,
         scrimColor = Dark.copy(alpha = 0.6f),
+        containerColor = LocalCoverColors.current.surfaceContainer,
         dragHandle =
             if (showHandle) {
                 {
-                    BottomSheetDefaults.DragHandle(
-                        width = 40.dp,
-                        height = 4.dp,
-                        color = Ink,
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth().topSeparator(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        BottomSheetDefaults.DragHandle(
+                            width = 40.dp,
+                            height = 4.dp,
+                            color = Ink,
+                        )
+                    }
                 }
             } else {
                 null
@@ -85,23 +95,38 @@ fun DmtSheet(
 }
 
 @Composable
-fun SheetHeader(title: String, modifier: Modifier = Modifier, meta: String? = null) {
-    Column(modifier = modifier.padding(horizontal = Margin, vertical = 12.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineLarge,
-            color = Ink,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (meta != null) {
+fun SheetHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    meta: String? = null,
+    titleColor: Color = Ink,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(horizontal = Margin, vertical = 12.dp)) {
             Text(
-                text = meta,
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
-                modifier = Modifier.padding(top = 6.dp),
+                text = title,
+                style = MaterialTheme.typography.headlineLarge,
+                color = titleColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
+            if (meta != null) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
         }
+        // Edge to edge, with a little air below the header before the line.
+        Box(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .padding(bottom = 4.dp)
+                    .height(1.dp)
+                    .background(Muted.copy(alpha = 0.4f)),
+        )
     }
 }
 
@@ -122,7 +147,7 @@ fun SheetAction(
                 .pressable(onClick = onClick, enabled = enabled, sink = 0.985f, label = label)
                 .padding(horizontal = Margin, vertical = 14.dp),
     ) {
-        DmtIcon(icon = icon, tint = if (enabled) Ink else Muted)
+        DmtIcon(icon = icon, tint = if (enabled) LocalCoverColors.current.primary else Muted)
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,

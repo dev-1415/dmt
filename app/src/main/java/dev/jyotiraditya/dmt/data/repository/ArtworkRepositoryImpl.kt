@@ -14,7 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.jyotiraditya.dmt.data.image.coverKey
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.repository.ArtworkRepository
-import dev.jyotiraditya.dmt.util.fieldColor
+import dev.jyotiraditya.dmt.util.contentFieldColor
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -82,7 +82,7 @@ constructor(
             if (!track.hasRemoteCover) colors.put(track.id, NO_COLOR)
             return null
         }
-        return art.fieldColor().toArgb().also { colors.put(track.id, it) }
+        return art.contentFieldColor().toArgb().also { colors.put(track.id, it) }
     }
 
     private val Track.hasRemoteCover: Boolean

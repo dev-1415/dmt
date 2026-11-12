@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.audiofx.AudioEffect
+import android.util.Log
 import android.util.LruCache
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationChannelCompat
@@ -19,6 +20,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSourceBitmapLoader
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.analytics.PlaybackStatsListener
 import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.session.CommandButton
@@ -95,6 +97,21 @@ class PlaybackService : MediaLibraryService() {
                 applyVolume()
             }
         player.addAnalyticsListener(playStatsListener())
+        player.addAnalyticsListener(
+            object : AnalyticsListener {
+                override fun onAudioUnderrun(
+                    eventTime: AnalyticsListener.EventTime,
+                    bufferSize: Int,
+                    bufferSizeMs: Long,
+                    elapsedSinceLastFeedMs: Long,
+                ) {
+                    Log.w(
+                        "DmtAudio",
+                        "underrun buffer=$bufferSize ms=$bufferSizeMs sinceFeed=$elapsedSinceLastFeedMs",
+                    )
+                }
+            },
+        )
         player.addListener(sessionListener(player))
         if (player.audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
             broadcastEffectSession(
@@ -210,6 +227,7 @@ class PlaybackService : MediaLibraryService() {
             saveSession()
             applyReplayGain(mediaItem)
             updateWakeMode(player, mediaItem)
+            player.applyOffloadPolicy(mediaItem)
         }
 
         override fun onAudioSessionIdChanged(audioSessionId: Int) {

@@ -45,7 +45,7 @@ fun Color.tintedDark(lightness: Float): Color {
     // a dark yellow is olive, while a dark gold still reads as the cover's colour.
     val lift =
         when {
-            hsl[0] in 15f..<45f -> 0.10f
+            hsl[0] in 15f..<45f -> 0.14f
             hsl[0] in 45f..75f -> 0.20f
             hsl[0] in 100f..160f -> 0.08f
             else -> 0f
@@ -70,3 +70,9 @@ val Int.rowFill: Color
 /** The text colour with the most contrast against this background. */
 fun Color.inkOn(): Color =
     if ((red * 0.2126f + green * 0.7152f + blue * 0.0722f) > 0.42f) Dark else Ink
+
+/** This colour blended toward white by [amount]. */
+fun Color.lighten(amount: Float): Color = lerp(this, Color.White, amount)
+
+/** This colour blended toward black by [amount]. */
+fun Color.darken(amount: Float): Color = lerp(this, Color.Black, amount)

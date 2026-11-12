@@ -29,8 +29,10 @@ import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.Cover
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.repository.ArtworkRepository
+import dev.jyotiraditya.dmt.ui.theme.CoverColors
 import dev.jyotiraditya.dmt.ui.theme.Surface2
-import dev.jyotiraditya.dmt.util.fieldColor
+import dev.jyotiraditya.dmt.util.contentColors
+import dev.jyotiraditya.dmt.util.contentFieldColor
 
 /** The covers, provided at the root of the UI. */
 val LocalArtwork = staticCompositionLocalOf<ArtworkRepository?> { null }
@@ -85,9 +87,19 @@ fun rememberFieldColor(track: Track?): Color {
 fun rememberFieldColor(bitmap: Bitmap?, seed: Long): Color {
     val field by
         produceState(fallbackField(seed), bitmap, seed) {
-            value = bitmap?.fieldColor() ?: fallbackField(seed)
+            value = bitmap?.contentFieldColor() ?: fallbackField(seed)
         }
     return field
+}
+
+/** The full Material You scheme for a decoded [bitmap], or [CoverColors.Fallback]. */
+@Composable
+fun rememberCoverColors(bitmap: Bitmap?, seed: Long): CoverColors {
+    val colors by
+        produceState(CoverColors.Fallback, bitmap, seed) {
+            value = bitmap?.contentColors() ?: CoverColors.Fallback
+        }
+    return colors
 }
 
 /** [field] easing into each new colour, to be read while drawing. */

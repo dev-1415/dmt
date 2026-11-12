@@ -45,12 +45,12 @@ import dev.jyotiraditya.dmt.ui.components.background
 import dev.jyotiraditya.dmt.ui.components.bottomSeparator
 import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.components.rememberFieldColor
+import dev.jyotiraditya.dmt.ui.components.TrackMosaic
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.motion.sharedElement
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
-import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
 import dev.jyotiraditya.dmt.ui.theme.fitShare
 import dev.jyotiraditya.dmt.ui.theme.inkOn
 import dev.jyotiraditya.dmt.ui.theme.poster
@@ -65,54 +65,67 @@ internal fun DetailHead(
     modifier: Modifier = Modifier,
     coverKey: Any? = null,
     tint: Color? = null,
+    mosaic: Boolean = false,
 ) {
     val seed = tracks.firstOrNull()
     val ownField = rememberFieldColor(seed)
-    val field = tint ?: ownField.darkenedForPlayer()
+    val field = tint ?: ownField
     val paint by animateFieldAsState(field)
     val ink = field.inkOn()
 
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background { paint }
-                .padding(horizontal = Margin)
-                .padding(top = 20.dp, bottom = 28.dp),
+        modifier = modifier.fillMaxWidth().background { paint },
     ) {
-        Artwork(
-            track = seed,
-            modifier =
-                Modifier.fillMaxWidth(0.66f)
-                    .wrapContentWidth(Alignment.Start)
-                    .widthIn(max = 300.dp)
-                    .aspectRatio(1f)
-                    .then(if (coverKey != null) Modifier.sharedElement(coverKey) else Modifier),
-        )
-        Text(
-            text = title,
-            style = poster(fitShare(title, 0.11f)),
-            color = ink,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 22.dp),
-        )
-        if (meta.isNotBlank()) {
-            Text(
-                text = meta,
-                style = MaterialTheme.typography.bodyLarge,
-                color = ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp),
+        if (mosaic) {
+            TrackMosaic(
+                tracks = tracks,
+                columns = 4,
+                rows = 2,
+                modifier = Modifier.fillMaxWidth().aspectRatio(2f),
+                key = tracks,
+            )
+        } else {
+            Artwork(
+                track = seed,
+                modifier =
+                    Modifier.padding(horizontal = Margin)
+                        .padding(top = 20.dp)
+                        .fillMaxWidth(0.66f)
+                        .wrapContentWidth(Alignment.Start)
+                        .widthIn(max = 300.dp)
+                        .aspectRatio(1f)
+                        .then(if (coverKey != null) Modifier.sharedElement(coverKey) else Modifier),
             )
         }
-        Text(
-            text = tracksSummary(tracks),
-            style = MaterialTheme.typography.bodySmall,
-            color = ink,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+        Column(
+            modifier =
+                Modifier.padding(horizontal = Margin)
+                    .padding(top = 20.dp, bottom = 28.dp),
+        ) {
+            Text(
+                text = title,
+                style = poster(fitShare(title, 0.11f)),
+                color = ink,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (meta.isNotBlank()) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Text(
+                text = tracksSummary(tracks),
+                style = MaterialTheme.typography.bodySmall,
+                color = ink,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 
@@ -128,7 +141,7 @@ internal fun DetailActions(
 ) {
     val seed = tracks.firstOrNull()
     val ownField = rememberFieldColor(seed)
-    val field = tint ?: ownField.darkenedForPlayer()
+    val field = tint ?: ownField
     val paint by animateFieldAsState(field)
     val ink = field.inkOn()
     Row(

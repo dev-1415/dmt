@@ -31,6 +31,7 @@ import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.LocalAccent
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.Numerals
@@ -52,7 +53,7 @@ fun TrackRow(
     metaTrailing: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    val mark = LocalAccent.current.highlight
+    val mark = LocalCoverColors.current.primary
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
@@ -233,26 +234,27 @@ fun SearchBox(
     onQuery: (String) -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
-    height: Dp = 48.dp,
+    height: Dp = 40.dp,
 ) {
+    val scheme = LocalCoverColors.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
             modifier
                 .fillMaxWidth()
                 .height(height)
-                .background(Surface)
-                .border(1.dp, Muted.copy(alpha = 0.5f))
+                .background(scheme.surfaceContainer)
+                .border(1.dp, scheme.primary.copy(alpha = 0.5f))
                 .padding(start = 16.dp, end = 4.dp),
     ) {
-        DmtIcon(icon = DmtIcons.Search, tint = Muted, size = 22.dp)
+        DmtIcon(icon = DmtIcons.Search, tint = scheme.primary, size = 22.dp)
         Spacer(modifier = Modifier.width(12.dp))
         BasicTextField(
             value = query,
             onValueChange = onQuery,
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = Ink),
-            cursorBrush = SolidColor(Ink),
+            cursorBrush = SolidColor(scheme.primary),
             modifier =
                 Modifier.weight(1f)
                     .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier),
@@ -268,6 +270,7 @@ fun SearchBox(
                 icon = DmtIcons.Close,
                 description = stringResource(R.string.search_clear),
                 onClick = { onQuery("") },
+                ink = scheme.primary,
                 iconSize = 20.dp,
             )
         }

@@ -10,6 +10,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,8 +20,10 @@ import dev.jyotiraditya.dmt.presentation.main.DmtScreen
 import dev.jyotiraditya.dmt.presentation.main.SetupScreen
 import dev.jyotiraditya.dmt.presentation.player.PlayerViewModel
 import dev.jyotiraditya.dmt.presentation.player.nowPlayingSeed
+import dev.jyotiraditya.dmt.ui.components.rememberCoverColors
 import dev.jyotiraditya.dmt.ui.components.rememberFieldColor
 import dev.jyotiraditya.dmt.ui.theme.DMTTheme
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.accentFor
 
 @AndroidEntryPoint
@@ -48,28 +51,31 @@ class MainActivity : ComponentActivity() {
             val state by playerViewModel.state.collectAsStateWithLifecycle()
             val player by playerViewModel.player.collectAsStateWithLifecycle()
             val cover = rememberFieldColor(state.cover.bitmap, state.nowPlayingSeed)
+            val coverColors = rememberCoverColors(state.cover.bitmap, state.nowPlayingSeed)
             DMTTheme(accent = accentFor(state.settings.accent, cover)) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    when {
-                        !state.settingsLoaded -> Unit
+                CompositionLocalProvider(LocalCoverColors provides coverColors) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        when {
+                            !state.settingsLoaded -> Unit
 
-                        !state.settings.setupDone ->
-                            SetupScreen(
-                                state = state,
-                                dispatch = playerViewModel::onIntent,
-                            )
+                            !state.settings.setupDone ->
+                                SetupScreen(
+                                    state = state,
+                                    dispatch = playerViewModel::onIntent,
+                                )
 
-                        else ->
-                            DmtScreen(
-                                state = state,
-                                player = player,
-                                field = cover,
-                                dispatch = playerViewModel::onIntent,
-                                artwork = playerViewModel.artwork,
-                            )
+                            else ->
+                                DmtScreen(
+                                    state = state,
+                                    player = player,
+                                    field = cover,
+                                    dispatch = playerViewModel::onIntent,
+                                    artwork = playerViewModel.artwork,
+                                )
+                        }
                     }
                 }
             }

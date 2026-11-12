@@ -60,10 +60,10 @@ import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.components.topSeparator
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.Surface
-import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
 import dev.jyotiraditya.dmt.ui.theme.inkOn
 import dev.jyotiraditya.dmt.ui.theme.secondary
 import kotlinx.coroutines.launch
@@ -111,7 +111,7 @@ internal fun BackBar(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val background = field.darkenedForPlayer()
+    val background = field
     val ink = background.inkOn()
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -156,8 +156,10 @@ internal fun BottomBar(
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val background = field.darkenedForPlayer()
+    val background = field
     val ink = background.inkOn()
+    val scheme = LocalCoverColors.current
+    val selectedInk = scheme.primary
     val rest = ink.secondary(background)
     val listState = rememberLazyListState()
     val selectedIndex = pagerState.currentPage.coerceIn(0, places.lastIndex)
@@ -184,7 +186,7 @@ internal fun BottomBar(
                         BottomTab(
                             place = p,
                             factor = if (!settingsOpen && index == selectedIndex) 1f else 0f,
-                            ink = ink,
+                            ink = selectedInk,
                             rest = rest,
                             onClick = { onPlace(p) },
                             onLongClick = { onLongPlace(p) },
@@ -211,7 +213,7 @@ internal fun BottomBar(
                         BottomTab(
                             place = p,
                             factor = if (!settingsOpen && index == selectedIndex) 1f else 0f,
-                            ink = ink,
+                            ink = selectedInk,
                             rest = rest,
                             onClick = { onPlace(p) },
                             onLongClick = { onLongPlace(p) },
@@ -248,7 +250,7 @@ internal fun BottomBar(
                     val progress = 1f - abs(2f * fraction - 1f)
                     val width = 24.dp.toPx() + 24.dp.toPx() * progress
                     drawRect(
-                        color = Color.White,
+                        color = selectedInk,
                         topLeft = Offset(center - width / 2f, 0f),
                         size = Size(width, size.height),
                     )
@@ -259,7 +261,7 @@ internal fun BottomBar(
             icon = DmtIcons.Settings,
             description = stringResource(R.string.nav_settings),
             onClick = onSettings,
-            ink = if (settingsOpen) ink else rest,
+            ink = if (settingsOpen) selectedInk else rest,
             active = settingsOpen,
             field = background,
             size = 40.dp,

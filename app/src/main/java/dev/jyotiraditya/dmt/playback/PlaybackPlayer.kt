@@ -1,11 +1,16 @@
 package dev.jyotiraditya.dmt.playback
 
 import android.content.Context
+import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioTrack
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
@@ -14,6 +19,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.AudioTrackAudioOutputProvider
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -21,13 +27,13 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 private const val SEEK_HOLD_STEP_MS = 5_000L
 
 /**
- * Opus and Vorbis are decoded in software on most phones, and the platform Codec2 decoders are
- * expensive. Report them as unavailable so ExoPlayer falls through to the bundled FFmpeg
- * renderer, while MP3/AAC keep the platform decoder and audio offload.
+ * Opus, Vorbis and MP3 are decoded in software on most phones, and the platform Codec2 decoders
+ * are expensive. Report them as unavailable so ExoPlayer falls through to the bundled FFmpeg
+ * renderer, while AAC keeps the platform decoder and compressed offload.
  */
-private val preferFfmpegForOpus =
+private val preferFfmpegForSoftware =
     MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
-        if (mimeType == MimeTypes.AUDIO_OPUS || mimeType == MimeTypes.AUDIO_VORBIS) {
+        if (mimeType == MimeTypes.AUDIO_VORBIS || mimeType == MimeTypes.AUDIO_OPUS) {
             emptyList()
         } else {
             MediaCodecSelector.DEFAULT.getDecoderInfos(
@@ -38,10 +44,7 @@ private val preferFfmpegForOpus =
         }
     }
 
-/**
- * A deeper PCM buffer and the power-saving AudioTrack path. Offload and passthrough keep their
- * default buffers so the DSP path is unchanged.
- */
+/** A deep PCM buffer and the power-saving AudioTrack path. */
 @OptIn(UnstableApi::class)
 private class PowerSavingRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
     override fun buildAudioSink(
@@ -51,8 +54,13 @@ private class PowerSavingRenderersFactory(context: Context) : DefaultRenderersFa
     ): AudioSink {
         val output =
             AudioTrackAudioOutputProvider.Builder(context)
-                .setAudioTrackBufferSizeProvider { minBuffer, _, outputMode, pcmFrameSize, sampleRate, _, _ ->
-                    if (outputMode == DefaultAudioSink.OUTPUT_MODE_PCM && pcmFrameSize > 0) {
+                .setAudioTrackBufferSizeProvider { minBuffer, maxBuffer, outputMode, pcmFrameSize, sampleRate, _, _ ->
+                    if (outputMode == DefaultAudioSink.OUTPUT_MODE_OFFLOAD) {
+                        // A deeper offload buffer gives the app more time to refill the DSP.
+                        val target = minBuffer.toLong() * 2
+                        (if (maxBuffer > 0) target.coerceAtMost(maxBuffer.toLong()) else target)
+                            .toInt()
+                    } else if (outputMode == DefaultAudioSink.OUTPUT_MODE_PCM && pcmFrameSize > 0) {
                         // About 250 ms of PCM, rounded to a whole frame.
                         val target = sampleRate.toLong() * pcmFrameSize / 4
                         maxOf(minBuffer.toLong(), target / pcmFrameSize * pcmFrameSize).toInt()
@@ -60,37 +68,118 @@ private class PowerSavingRenderersFactory(context: Context) : DefaultRenderersFa
                         minBuffer
                     }
                 }
-                .setAudioTrackBuilderModifier { builder, config ->
-                    if (!config.isOffload) {
-                        runCatching {
-                            builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_POWER_SAVING)
-                        }
+                .setAudioTrackBuilderModifier { builder, _ ->
+                    runCatching {
+                        builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_POWER_SAVING)
                     }
                 }
                 .build()
-        return DefaultAudioSink.Builder(context)
-            .setEnableFloatOutput(enableFloatOutput)
-            .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
-            .setAudioOutputProvider(output)
+        val sink =
+            DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
+                .setAudioOutputProvider(output)
+                .setExperimentalAudioOffloadListener(
+                    object : ExoPlayer.AudioOffloadListener {
+                        override fun onOffloadedPlayback(isOffloadedPlayback: Boolean) {
+                            Log.i("DmtAudio", "offloaded=$isOffloadedPlayback")
+                        }
+                    },
+                )
+                .build()
+        return object : ForwardingAudioSink(sink) {
+            override fun setOffloadDelayPadding(delayInFrames: Int, paddingInFrames: Int) {
+                // The MP3 gapless metadata can confuse the offload DSP; let it play the raw
+                // frames instead.
+                super.setOffloadDelayPadding(0, 0)
+            }
+        }
+    }
+}
+
+/**
+ * MP3 offload glitches on some devices, so MP3 is decoded on the platform decoder and the PCM
+ * path. AAC and the other formats keep compressed offload, which is the efficient path.
+ */
+@OptIn(UnstableApi::class)
+internal fun Player.applyOffloadPolicy(mediaItem: MediaItem?) {
+    val path = mediaItem?.localConfiguration?.tag as? String ?: return
+    val extension = path.substringAfterLast('.', "").lowercase()
+    // Debug: test MP3 offload with the deeper buffer and event logging.
+    val offload = true
+    val gapless = extension != "opus" && extension != "ogg"
+    val mode =
+        if (offload) {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+        } else {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
+        }
+    trackSelectionParameters =
+        trackSelectionParameters
+            .buildUpon()
+            .setAudioOffloadPreferences(
+                AudioOffloadPreferences.Builder()
+                    .setAudioOffloadMode(mode)
+                    .setIsGaplessSupportRequired(gapless)
+                    .build(),
+            )
             .build()
+}
+
+/** Logs which compressed formats the device reports as offloadable. */
+private fun logOffloadSupport(context: Context) {
+    val manager = context.getSystemService(AudioManager::class.java) ?: return
+    val attributes =
+        AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+    val formats =
+        mapOf(
+            "mp3" to AudioFormat.ENCODING_MP3,
+            "aac" to AudioFormat.ENCODING_AAC_LC,
+            "opus" to AudioFormat.ENCODING_OPUS,
+        )
+    val method =
+        runCatching {
+            AudioManager::class.java.getMethod(
+                "isOffloadedPlaybackSupported",
+                AudioFormat::class.java,
+                AudioAttributes::class.java,
+            )
+        }
+            .getOrNull()
+    for ((name, encoding) in formats) {
+        val format =
+            AudioFormat.Builder()
+                .setEncoding(encoding)
+                .setSampleRate(48_000)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                .build()
+        val supported =
+            method
+                ?.let { runCatching { it.invoke(manager, format, attributes) as? Boolean }.getOrNull() }
+                ?: false
+        Log.i("DmtAudio", "offload $name=$supported")
     }
 }
 
 /** The music player: bundled decoders first, offload where supported, focus and noisy handled. */
 @OptIn(UnstableApi::class)
 internal fun Context.buildMusicPlayer(dataSourceFactory: DataSource.Factory): ExoPlayer {
+    logOffloadSupport(this)
     val renderers =
         PowerSavingRenderersFactory(this)
             // Platform decoders are more power-efficient; extensions only fill the gaps.
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-            .setMediaCodecSelector(preferFfmpegForOpus)
+            .setMediaCodecSelector(preferFfmpegForSoftware)
             .setEnableDecoderFallback(true)
     val offload =
         AudioOffloadPreferences.Builder()
             .setAudioOffloadMode(AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
-            // Opus files carry pre-skip, and many devices do not report gapless offload for
-            // them. Requiring gapless would force those tracks back onto the CPU decoder.
-            .setIsGaplessSupportRequired(false)
+            // The upstream player requires gapless offload. Without it, some devices'
+            // offload DSP can glitch mid-track.
+            .setIsGaplessSupportRequired(true)
             .build()
     val trackSelector =
         DefaultTrackSelector(this).apply {

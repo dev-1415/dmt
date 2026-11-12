@@ -34,8 +34,10 @@ import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.ui.components.EmptyState
 import dev.jyotiraditya.dmt.ui.components.pressable
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.LyricType
 import dev.jyotiraditya.dmt.ui.theme.NightInk
+import dev.jyotiraditya.lyrics.mainVocalOnly
 
 /** How far ahead of the reported position words are lit, to cover display latency. */
 private const val LEAD_MS = 80L
@@ -53,9 +55,10 @@ internal fun LyricsPanel(
 ) {
     val lyrics = state.lyrics
     val bySinger = state.settings.singerColors
+    val primary = LocalCoverColors.current.primary
     val colors =
-        remember(bySinger, background) {
-            LyricColors.on(ink = NightInk, background = background, bySinger)
+        remember(bySinger, background, primary) {
+            LyricColors.on(ink = NightInk, background = background, bySinger, lead = primary)
         }
     val playPause = rememberPlayPauseButtonState(player)
 
@@ -129,8 +132,9 @@ internal fun CurrentLyricLine(
     ) {
         if (lyrics != null) {
             val bySinger = state.settings.singerColors
-            val colors = remember(bySinger, background) {
-                LyricColors.on(ink = NightInk, background = background, bySinger)
+            val primary = LocalCoverColors.current.primary
+            val colors = remember(bySinger, background, primary) {
+                LyricColors.on(ink = NightInk, background = background, bySinger, lead = primary)
             }
             val position =
                 rememberPlaybackPosition(
@@ -152,21 +156,22 @@ internal fun CurrentLyricLine(
                 } else {
                     lyrics.lines.firstOrNull()
                 }
-            val text = line?.text?.takeIf { it.isNotBlank() }
-            if (text != null) {
+            val main = line?.mainVocalOnly()
+            val text = main?.text?.takeIf { it.isNotBlank() }
+            if (main != null && text != null) {
                 val style =
                     LyricType.copy(
                         fontSize = 20.sp,
                         lineHeight = 24.sp,
                         textAlign = TextAlign.Start,
                     )
-                if (lyrics.synced && line.words.isNotEmpty()) {
+                if (lyrics.synced && main.words.isNotEmpty()) {
                     SweepText(
                         text = text,
-                        words = line.words,
+                        words = main.words,
                         position = position,
                         style = style,
-                        sung = colors.singer(line),
+                        sung = colors.singer(main),
                         unsung = colors.unsung,
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 2,

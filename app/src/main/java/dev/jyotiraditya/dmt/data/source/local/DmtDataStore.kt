@@ -23,6 +23,7 @@ val KEY_FOLDER_SORT = stringPreferencesKey("folder_sort")
 val KEY_FOLDER_SORT_ASCENDING = booleanPreferencesKey("folder_sort_ascending")
 val KEY_START_FOLDER = stringPreferencesKey("start_folder")
 val KEY_VISIBLE_LIBRARY_TABS = stringSetPreferencesKey("visible_library_tabs")
+val KEY_LIBRARY_TAB_ORDER = stringPreferencesKey("library_tab_order")
 
 val KEY_SPEED = floatPreferencesKey("speed")
 val KEY_KEEP_PITCH = booleanPreferencesKey("keep_pitch")

@@ -36,8 +36,6 @@ import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.animateFieldAsState
 import dev.jyotiraditya.dmt.ui.theme.Margin
-import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
-import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayerTop
 
 /** The Now Playing section: the player, with the lyrics in the cover's square on request. */
 @Composable
@@ -56,8 +54,9 @@ internal fun NowPlayingPage(
     val steps = rememberSeekSteps()
     val wide = windowShape().wide
     val paint by animateFieldAsState(field)
-    val playerBackground = paint.darkenedForPlayer()
-    val playerTop = paint.darkenedForPlayerTop()
+    // Gramophone uses the content-based Material surface directly, without a second darkening.
+    val playerBackground = paint
+    val playerTop = paint
 
     if (showDetails) {
         DmtSheet(

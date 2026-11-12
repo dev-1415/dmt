@@ -22,6 +22,7 @@ import dev.jyotiraditya.dmt.data.source.local.KEY_LAST_SHUFFLE
 import dev.jyotiraditya.dmt.data.source.local.KEY_LAST_SHUFFLE_ORDER
 import dev.jyotiraditya.dmt.data.source.local.KEY_LIBRARY_GENERATION
 import dev.jyotiraditya.dmt.data.source.local.KEY_LIBRARY_SORT
+import dev.jyotiraditya.dmt.data.source.local.KEY_LIBRARY_TAB_ORDER
 import dev.jyotiraditya.dmt.data.source.local.KEY_LYRICS_SOURCE
 import dev.jyotiraditya.dmt.data.source.local.KEY_NORMALIZE
 import dev.jyotiraditya.dmt.data.source.local.KEY_ROMANIZED_LYRICS
@@ -187,6 +188,13 @@ private fun Preferences.toSettings(): DmtSettings = DmtSettings(
             ?.mapNotNull { name -> LibraryTab.entries.find { it.name == name } }
             ?.toSet()
             ?: LibraryTab.entries.toSet(),
+    libraryTabOrder =
+        this[KEY_LIBRARY_TAB_ORDER]
+            ?.split(',')
+            ?.mapNotNull { name -> LibraryTab.entries.find { it.name == name } }
+            ?.distinct()
+            ?.let { saved -> saved + LibraryTab.entries.filterNot { it in saved } }
+            ?: LibraryTab.entries,
     sources = this[KEY_SOURCES]?.toSources().orEmpty(),
     activeSource = this[KEY_ACTIVE_SOURCE],
 )
@@ -209,6 +217,7 @@ private fun MutablePreferences.write(settings: DmtSettings) {
     this[KEY_FOLDER_SORT_ASCENDING] = settings.folderSortAscending
     putOrRemove(KEY_START_FOLDER, settings.startFolder)
     this[KEY_VISIBLE_LIBRARY_TABS] = settings.visibleLibraryTabs.map { it.name }.toSet()
+    this[KEY_LIBRARY_TAB_ORDER] = settings.libraryTabOrder.joinToString(",") { it.name }
     this[KEY_SOURCES] = settings.sources.encodeSources()
     putOrRemove(KEY_ACTIVE_SOURCE, settings.activeSource)
 }

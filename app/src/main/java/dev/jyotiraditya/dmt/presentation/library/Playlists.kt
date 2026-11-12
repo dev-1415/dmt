@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.jyotiraditya.dmt.R
@@ -49,6 +52,7 @@ import dev.jyotiraditya.dmt.presentation.main.LocalContentBottom
 import dev.jyotiraditya.dmt.presentation.nowplaying.rememberWantsPlayback
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
+import dev.jyotiraditya.dmt.ui.components.Artwork
 import dev.jyotiraditya.dmt.ui.components.Block
 import dev.jyotiraditya.dmt.ui.components.CollectionRow
 import dev.jyotiraditya.dmt.ui.components.DmtIcon
@@ -57,6 +61,7 @@ import dev.jyotiraditya.dmt.ui.components.IconTap
 import dev.jyotiraditya.dmt.ui.components.SheetAction
 import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.TextLink
+import dev.jyotiraditya.dmt.ui.components.TrackMosaic
 import dev.jyotiraditya.dmt.ui.components.TrackRow
 import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
@@ -155,12 +160,69 @@ private fun PlaylistLine(playlist: Playlist, dispatch: (DmtAction) -> Unit) {
             onExport = { exportLauncher.launch("${playlist.name}.m3u8") },
         )
     }
-    CollectionRow(
-        title = playlist.name,
-        detail = tracksSummary(playlist.tracks),
+    PlaylistRow(
+        playlist = playlist,
         onClick = { dispatch(DmtAction.OpenPlaylist(playlist.name)) },
         onLongClick = { acting = true },
     )
+}
+
+/** A playlist with a mosaic of its album covers when it spans more than one album. */
+@Composable
+private fun PlaylistRow(
+    playlist: Playlist,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val albums =
+        remember(playlist.tracks) {
+            playlist.tracks.distinctBy { it.album.ifBlank { it.coverUri?.toString().orEmpty() } }
+        }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier.fillMaxWidth()
+                .pressable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    sink = 0.985f,
+                    label = playlist.name,
+                )
+                .padding(horizontal = Margin, vertical = 12.dp),
+    ) {
+        if (albums.size > 1) {
+            TrackMosaic(
+                tracks = playlist.tracks,
+                columns = 2,
+                rows = 2,
+                modifier = Modifier.size(56.dp),
+                key = playlist.name,
+            )
+        } else {
+            Artwork(
+                track = playlist.tracks.firstOrNull(),
+                modifier = Modifier.size(56.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = playlist.name,
+                style = MaterialTheme.typography.titleLarge,
+                color = Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = tracksSummary(playlist.tracks),
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -171,12 +233,17 @@ internal fun PlaylistDetail(playlist: Playlist, state: DmtState, dispatch: (DmtA
         PickerSheet(playlist, state, dispatch) { picking = false }
     }
     val playing = rememberWantsPlayback()
+    val albums =
+        remember(playlist.tracks) {
+            playlist.tracks.distinctBy { it.album.ifBlank { it.coverUri?.toString().orEmpty() } }
+        }
     LazyColumn(contentPadding = PaddingValues(bottom = LocalContentBottom.current)) {
         item {
             DetailHead(
                 title = playlist.name,
                 meta = stringResource(R.string.collection_playlist),
                 tracks = playlist.tracks,
+                mosaic = albums.size > 1,
             )
         }
         stickyHeader {

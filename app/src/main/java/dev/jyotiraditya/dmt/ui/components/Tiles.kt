@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +22,8 @@ import dev.jyotiraditya.dmt.domain.model.Folder
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.Muted
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val CaptionGap = 10.dp
 
@@ -67,20 +71,27 @@ fun CoverTile(
     }
 }
 
-/** A square collage of the first album covers in [folder]. */
+/** A collage of the first distinct album covers in [tracks]. */
 @Composable
-fun FolderCover(
-    folder: Folder,
+fun TrackMosaic(
+    tracks: List<Track>,
     modifier: Modifier = Modifier,
     columns: Int = 2,
     rows: Int = columns,
     background: Color = Color.Transparent,
+    key: Any = tracks,
 ) {
-    val covers =
-        remember(folder, columns, rows) {
-            folder.allTracks
-                .distinctBy { it.album.ifBlank { it.coverUri?.toString().orEmpty() } }
-                .take(columns * rows)
+    // A folder can hold thousands of tracks; finding its distinct covers must not run on the
+    // main thread while a tab is sliding in.
+    val initial = remember(key, columns, rows) { tracks.take(columns * rows) }
+    val covers by
+        produceState(initialValue = initial, key, columns, rows) {
+            value =
+                withContext(Dispatchers.Default) {
+                    tracks
+                        .distinctBy { it.album.ifBlank { it.coverUri?.toString().orEmpty() } }
+                        .take(columns * rows)
+                }
         }
     Column(modifier = modifier.background(background)) {
         repeat(rows) { row ->
@@ -104,4 +115,23 @@ fun FolderCover(
             }
         }
     }
+}
+
+/** A square collage of the first album covers in [folder]. */
+@Composable
+fun FolderCover(
+    folder: Folder,
+    modifier: Modifier = Modifier,
+    columns: Int = 2,
+    rows: Int = columns,
+    background: Color = Color.Transparent,
+) {
+    TrackMosaic(
+        tracks = folder.allTracks,
+        modifier = modifier,
+        columns = columns,
+        rows = rows,
+        background = background,
+        key = folder,
+    )
 }

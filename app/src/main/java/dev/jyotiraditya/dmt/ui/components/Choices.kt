@@ -20,6 +20,7 @@ import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.motion.FADE_MS
 import dev.jyotiraditya.dmt.ui.theme.Ground
 import dev.jyotiraditya.dmt.ui.theme.Ink
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.Surface2
@@ -69,9 +70,10 @@ fun ChoiceRow(
 /** A square that fills with a check while [selected], and shows [empty] otherwise. */
 @Composable
 fun SelectionMark(selected: Boolean, modifier: Modifier = Modifier, empty: Color = Surface2) {
+    val scheme = LocalCoverColors.current
     val fill by
         animateColorAsState(
-            if (selected) Ink else empty,
+            if (selected) scheme.primary else empty,
             tween(FADE_MS),
             label = "choiceMark",
         )
@@ -79,6 +81,6 @@ fun SelectionMark(selected: Boolean, modifier: Modifier = Modifier, empty: Color
         contentAlignment = Alignment.Center,
         modifier = modifier.size(MarkSize).background { fill },
     ) {
-        if (selected) DmtIcon(icon = DmtIcons.Check, tint = Ground, size = MarkGlyph)
+        if (selected) DmtIcon(icon = DmtIcons.Check, tint = scheme.onPrimary, size = MarkGlyph)
     }
 }

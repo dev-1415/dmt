@@ -324,7 +324,7 @@
     <string name="settings_start_folder_hint">The folder the Folders tab opens at. You can still browse up to other folders.</string>
     <string name="settings_start_folder_empty">No folders yet.</string>
     <string name="settings_library_tabs">Library tabs</string>
-    <string name="settings_library_tabs_hint">Choose which library sections appear in the top bar.</string>
+    <string name="settings_library_tabs_hint">Choose which library sections appear in the top bar, and use the arrows to reorder them.</string>
     <plurals name="settings_library_tabs_count">
         <item quantity="one">%1$d shown</item>
         <item quantity="other">%1$d shown</item>

@@ -8,6 +8,58 @@ internal fun List<LyricLine>.stripBackgroundBrackets(): List<LyricLine> = map {
     it.withoutBackgroundBrackets()
 }
 
+/**
+ * This line with its backing vocals removed, for the compact now-playing line. The full lyrics
+ * view keeps them.
+ */
+fun LyricLine.mainVocalOnly(): LyricLine {
+    val stripped = withoutBackgroundBrackets()
+    if (stripped.words.none { it.background }) return stripped
+    val ranges =
+        stripped.words
+            .filter { it.background }
+            .map { it.start until it.end }
+            .sortedBy { it.first }
+    val merged = mutableListOf<IntRange>()
+    for (range in ranges) {
+        val last = merged.lastOrNull()
+        if (last != null && range.first <= last.last + 1) {
+            merged[merged.lastIndex] = last.first..maxOf(last.last, range.last)
+        } else {
+            merged += range
+        }
+    }
+
+    fun removedBefore(offset: Int): Int =
+        merged.sumOf { range ->
+            when {
+                offset <= range.first -> 0
+                offset > range.last -> range.last - range.first + 1
+                else -> offset - range.first
+            }
+        }
+
+    val text =
+        buildString {
+            var cursor = 0
+            for (range in merged) {
+                append(stripped.text, cursor, range.first)
+                cursor = range.last + 1
+            }
+            append(stripped.text, cursor, stripped.text.length)
+        }
+    val words =
+        stripped.words
+            .filterNot { it.background }
+            .map {
+                it.copy(
+                    start = it.start - removedBefore(it.start),
+                    end = it.end - removedBefore(it.end),
+                )
+            }
+    return stripped.copy(text = text, words = words)
+}
+
 private fun LyricLine.withoutBackgroundBrackets(): LyricLine {
     val cuts = backgroundRuns().flatMap { text.wrappingBrackets(it) }.sorted().toIntArray()
     if (cuts.isEmpty()) return this

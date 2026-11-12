@@ -56,6 +56,8 @@ fun Track.toQueueRequest(): MediaItem = MediaItem.Builder().setMediaId(id.toStri
 fun Track.toMediaItem(): MediaItem = MediaItem.Builder()
     .setMediaId(id.toString())
     .setUri(uri)
+    // The service reads this to pick the right offload policy for the file type.
+    .setTag(path)
     .apply {
         if (clipStartMs != null || clipEndMs != null) {
             setClippingConfiguration(

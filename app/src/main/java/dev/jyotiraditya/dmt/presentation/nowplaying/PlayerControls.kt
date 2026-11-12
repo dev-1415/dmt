@@ -47,6 +47,7 @@ import dev.jyotiraditya.dmt.ui.components.IconChip
 import dev.jyotiraditya.dmt.ui.components.IconTap
 import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import kotlin.math.abs
 
 private const val PLAY_PRESS_SCALE = 0.92f
@@ -71,6 +72,8 @@ internal fun Transport(
     val seekForward = rememberSeekForwardButtonState(player)
     val shuffle = rememberShuffleButtonState(player)
     val repeat = rememberRepeatButtonState(player, REPEAT_MODES)
+    val scheme = LocalCoverColors.current
+    val controlInk = scheme.primary
     var volumeAnchor by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -86,9 +89,13 @@ internal fun Transport(
                         sink = PLAY_PRESS_SCALE,
                         label = stringResource(playPause.label),
                     )
-                    .background(ink),
+                    .background(scheme.primaryContainer),
         ) {
-            DmtIcon(icon = playPause.icon, tint = field, size = PlayerDimens.PlayGlyph)
+            DmtIcon(
+                icon = playPause.icon,
+                tint = scheme.onPrimaryContainer,
+                size = PlayerDimens.PlayGlyph,
+            )
         }
         Spacer(modifier = Modifier.width(PlayerDimens.PlayToSkip))
         IconTap(
@@ -100,7 +107,7 @@ internal fun Transport(
                 steps.onStep(-seekBack.seekBackAmountMs)
             },
             enabled = previous.isEnabled,
-            ink = ink,
+            ink = controlInk,
             size = PlayerDimens.SkipButton,
             iconSize = PlayerDimens.SkipGlyph,
         )
@@ -113,7 +120,7 @@ internal fun Transport(
                 steps.onStep(seekForward.seekForwardAmountMs)
             },
             enabled = next.isEnabled,
-            ink = ink,
+            ink = controlInk,
             size = PlayerDimens.SkipButton,
             iconSize = PlayerDimens.SkipGlyph,
         )
@@ -121,7 +128,7 @@ internal fun Transport(
             icon = DmtIcons.Volume,
             description = stringResource(R.string.player_volume),
             onClick = { volumeAnchor?.let(onVolume) },
-            ink = ink,
+            ink = controlInk,
             size = PlayerDimens.SkipButton,
             iconSize = PlayerDimens.SkipGlyph,
             modifier = Modifier.onGloballyPositioned { volumeAnchor = it },
@@ -133,8 +140,9 @@ internal fun Transport(
             active = shuffle.shuffleOn,
             onClick = shuffle::onClick,
             enabled = shuffle.isEnabled,
-            ink = ink,
-            field = field,
+            ink = controlInk,
+            field = scheme.onPrimary,
+            activeFill = scheme.primary,
         )
         IconTap(
             icon =
@@ -147,8 +155,9 @@ internal fun Transport(
             active = repeat.repeatModeState != Player.REPEAT_MODE_OFF,
             onClick = repeat::onClick,
             enabled = repeat.isEnabled,
-            ink = ink,
-            field = field,
+            ink = controlInk,
+            field = scheme.onPrimary,
+            activeFill = scheme.primary,
         )
     }
 }
@@ -207,6 +216,7 @@ internal fun PlayerActions(
 ) {
     var sheet by rememberSaveable { mutableStateOf<ExtraSheet?>(null) }
     val speed = rememberPlaybackSpeedState(player).playbackSpeed
+    val chipInk = LocalCoverColors.current.primary
     Row(
         horizontalArrangement = Arrangement.spacedBy(PlayerDimens.ToggleGap),
         verticalAlignment = Alignment.CenterVertically,
@@ -219,7 +229,7 @@ internal fun PlayerActions(
                 value = null,
                 on = false,
                 onClick = onOpenAlbum,
-                ink = ink,
+                ink = chipInk,
                 field = field,
             )
         }
@@ -229,7 +239,7 @@ internal fun PlayerActions(
             value = null,
             on = false,
             onClick = onOpenDetails,
-            ink = ink,
+            ink = chipInk,
             field = field,
         )
         IconChip(
@@ -245,7 +255,7 @@ internal fun PlayerActions(
                 },
             on = state.sleepOn,
             onClick = { sheet = ExtraSheet.SLEEP },
-            ink = ink,
+            ink = chipInk,
             field = field,
         )
         val speedChanged = abs(speed - 1f) > NORMAL_SPEED_TOLERANCE
@@ -256,7 +266,7 @@ internal fun PlayerActions(
             value = speedLabel.takeIf { speedChanged },
             on = speedChanged,
             onClick = { sheet = ExtraSheet.SPEED },
-            ink = ink,
+            ink = chipInk,
             field = field,
         )
         if (lyricsOpen) {
@@ -266,7 +276,7 @@ internal fun PlayerActions(
                 value = null,
                 on = false,
                 onClick = onToggleLyrics,
-                ink = ink,
+                ink = chipInk,
                 field = field,
             )
         }
@@ -276,7 +286,7 @@ internal fun PlayerActions(
             value = null,
             on = false,
             onClick = { dispatch(DmtAction.OpenLyricsSources) },
-            ink = ink,
+            ink = chipInk,
             field = field,
         )
     }

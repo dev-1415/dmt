@@ -28,6 +28,7 @@ import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.pressableSelect
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.rowFill
@@ -44,7 +45,12 @@ fun LyricsSourceSheet(
     onDismiss: () -> Unit,
 ) {
     DmtSheet(onDismiss = onDismiss) {
-        SheetHeader(title = stringResource(R.string.lyrics_source_title), meta = trackTitle)
+        val scheme = LocalCoverColors.current
+        SheetHeader(
+            title = stringResource(R.string.lyrics_source_title),
+            meta = trackTitle,
+            titleColor = scheme.primary,
+        )
         Column(modifier = Modifier.selectableGroup()) {
             LyricsSource.entries.forEachIndexed { index, source ->
                 val status = sources[source]
@@ -53,8 +59,8 @@ fun LyricsSourceSheet(
                     detail = stringResource(source.hint),
                     tag = stringResource(status.tag(source)),
                     chosen = source == current,
-                    fill = index.rowFill,
-                    mark = (index + 1).rowFill,
+                    fill = if (index % 2 == 0) scheme.surface else scheme.surfaceContainer,
+                    mark = if (index % 2 == 0) scheme.surfaceContainer else scheme.surface,
                     // Online sources stay pickable; a miss may have been a network error.
                     enabled = source.online || status is LyricsSourceStatus.Found,
                     onClick = { onPick(source) },
@@ -86,6 +92,7 @@ private fun SourceRow(
     onClick: () -> Unit,
 ) {
     val ink = if (enabled) Ink else Muted
+    val scheme = LocalCoverColors.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
@@ -105,11 +112,11 @@ private fun SourceRow(
                 Text(
                     text = tag,
                     style = MaterialTheme.typography.labelSmall,
-                    color = ink,
+                    color = scheme.onPrimaryContainer,
                     maxLines = 1,
                     modifier =
                         Modifier.padding(start = 8.dp)
-                            .background(ink.copy(alpha = 0.12f))
+                            .background(scheme.primaryContainer)
                             .padding(horizontal = 6.dp, vertical = 3.dp),
                 )
             }

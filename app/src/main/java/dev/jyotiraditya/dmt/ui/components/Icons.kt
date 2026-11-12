@@ -58,13 +58,14 @@ fun IconTap(
     ink: Color = Ink,
     field: Color = Ground,
     active: Boolean = false,
+    activeFill: Color = ink,
     size: Dp = 48.dp,
     iconSize: Dp = 24.dp,
     onLongClick: (() -> Unit)? = null,
     onHold: (() -> Unit)? = null,
     enabled: Boolean = true,
 ) {
-    val fill by animateColorAsState(if (active) ink else Color.Transparent, label = "iconFill")
+    val fill by animateColorAsState(if (active) activeFill else Color.Transparent, label = "iconFill")
     val glyph by animateColorAsState(if (active) field else ink, label = "iconGlyph")
     val scope = rememberCoroutineScope()
     val interaction = remember { MutableInteractionSource() }

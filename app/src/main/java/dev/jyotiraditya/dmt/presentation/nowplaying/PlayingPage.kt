@@ -65,6 +65,7 @@ import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.motion.FADE_MS
 import dev.jyotiraditya.dmt.ui.motion.SurfaceSpring
 import dev.jyotiraditya.dmt.ui.theme.Margin
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Night
 import dev.jyotiraditya.dmt.ui.theme.NightInk
 import dev.jyotiraditya.dmt.ui.theme.Numerals
@@ -285,12 +286,13 @@ private fun SeekRow(state: DmtState, player: Player, field: Color, ink: Color, d
     val clock = rememberProgressStateWithTickInterval(player, tickIntervalMs = 1000L)
     val cue = state.nowPlayingTrack?.cue == true
     val shown = hold.shownMs(clock.currentPositionMs)
+    val primary = LocalCoverColors.current.primary
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SeekBar(
             fraction = { hold.fraction },
             scrubbing = hold.scrubbing,
-            ink = ink,
+            ink = primary,
             onScrub = hold::onScrub,
             onSeek = hold::onSeek,
             modifier = Modifier.onSizeChanged { width = it.width },

@@ -60,7 +60,7 @@ import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.components.topSeparator
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
-import dev.jyotiraditya.dmt.ui.theme.LocalAccent
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.Surface2
@@ -385,7 +385,7 @@ private fun FullQueueRow(
     onLongClick: () -> Unit,
     handle: (@Composable () -> Unit)?,
 ) {
-    val mark = LocalAccent.current.highlight
+    val mark = LocalCoverColors.current.primary
     val endPadding = if (handle != null) 24.dp else Margin
     Row(
         verticalAlignment = Alignment.CenterVertically,

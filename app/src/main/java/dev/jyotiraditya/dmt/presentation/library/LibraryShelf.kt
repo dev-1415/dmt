@@ -78,7 +78,7 @@ internal fun LibraryHead(
                 .fillMaxWidth()
                 .background(tint ?: Ground)
                 .topSeparator()
-                .padding(vertical = 8.dp),
+                .padding(vertical = 4.dp),
     ) {
         SearchBox(
             query = state.query,

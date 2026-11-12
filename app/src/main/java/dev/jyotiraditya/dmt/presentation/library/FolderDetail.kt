@@ -65,7 +65,6 @@ import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ground
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
-import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
 import dev.jyotiraditya.dmt.ui.theme.inkOn
 
 /** A folder's subfolders and direct tracks, with the folder's sort controls. */
@@ -132,10 +131,7 @@ internal fun FolderDetail(
                     columns = 4,
                     rows = 4,
                     background = Color.Transparent,
-                    modifier =
-                        Modifier.padding(horizontal = Margin, vertical = 12.dp)
-                            .fillMaxWidth()
-                            .aspectRatio(1f),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 )
             }
             stickyHeader {
@@ -177,7 +173,7 @@ private fun FolderHeader(
 ) {
     val seed = tracks.firstOrNull()
     val ownField = rememberFieldColor(seed)
-    val field = tint ?: ownField.darkenedForPlayer()
+    val field = tint ?: ownField
     val paint by animateFieldAsState(field)
     val ink = field.inkOn()
     Column(modifier = Modifier.fillMaxWidth().background { paint }) {

@@ -132,6 +132,8 @@ data class DmtSettings(
     val startFolder: String? = null,
     /** The library sections shown as top-level tabs. */
     val visibleLibraryTabs: Set<LibraryTab> = LibraryTab.entries.toSet(),
+    /** The order the library sections appear in, including the hidden ones. */
+    val libraryTabOrder: List<LibraryTab> = LibraryTab.entries,
     /** The servers added as sources, in the order they were added. */
     val sources: List<ServerSource> = emptyList(),
     /** The [ServerSource.id] of the source in use, or null for this device. */

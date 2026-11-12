@@ -65,7 +65,6 @@ import dev.jyotiraditya.dmt.ui.components.Notice
 import dev.jyotiraditya.dmt.ui.motion.FADE_MS
 import dev.jyotiraditya.dmt.ui.theme.Ground
 import dev.jyotiraditya.dmt.ui.theme.Margin
-import dev.jyotiraditya.dmt.ui.theme.darkenedForPlayer
 import kotlinx.coroutines.launch
 
 /** Bottom padding that keeps the last row of a list clear of what sits below it. */
@@ -84,10 +83,24 @@ fun DmtScreen(
     artwork: ArtworkRepository,
 ) {
     val visiblePlaces =
-        remember(state.settings.visibleLibraryTabs) {
-            Place.entries.filter { place ->
-                place.libraryTab == null || place.libraryTab in state.settings.visibleLibraryTabs
-            }
+        remember(state.settings.visibleLibraryTabs, state.settings.libraryTabOrder) {
+            val order = state.settings.libraryTabOrder
+            val library =
+                Place.entries
+                    .filter {
+                        it.libraryTab != null &&
+                            it.libraryTab in state.settings.visibleLibraryTabs
+                    }
+                    .sortedBy { order.indexOf(it.libraryTab) }
+            val before =
+                Place.entries.filter {
+                    it.libraryTab == null && it.ordinal < Place.FOLDERS.ordinal
+                }
+            val after =
+                Place.entries.filter {
+                    it.libraryTab == null && it.ordinal > Place.GENRES.ordinal
+                }
+            before + library + after
         }
     val pager = rememberPagerState(pageCount = { visiblePlaces.size })
     val place = visiblePlaces.getOrNull(pager.currentPage) ?: visiblePlaces.first()
@@ -226,10 +239,13 @@ fun DmtScreen(
                 if (next == Place.FOLDERS && place == Place.FOLDERS) {
                     dispatch(DmtAction.ResetFolder)
                 }
+                if (next == Place.PLAYLISTS && place == Place.PLAYLISTS) {
+                    dispatch(DmtAction.OpenPlaylist(null))
+                }
                 go(next)
             }
             if (!rail) {
-                if (back != null && place != Place.FOLDERS) {
+                if (back != null && place != Place.FOLDERS && place != Place.PLAYLISTS) {
                     BackBar(label = back.label, field = field, onBack = ::goBack)
                 } else {
                     Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
@@ -268,7 +284,7 @@ fun DmtScreen(
                         } else {
                             HorizontalPager(
                                 state = pager,
-                                beyondViewportPageCount = 1,
+                                beyondViewportPageCount = 2,
                                 modifier = Modifier.fillMaxSize(),
                             ) { page ->
                                 val active = pager.currentPage == page
@@ -277,7 +293,7 @@ fun DmtScreen(
                                         QueuePage(
                                             state = state,
                                             player = player,
-                                            tint = field.darkenedForPlayer(),
+                                            tint = field,
                                             dispatch = dispatch,
                                             scrollToCurrent = queueScrollRequest,
                                             onScrolledToCurrent = { queueScrollRequest = false },
@@ -331,7 +347,7 @@ fun DmtScreen(
                                             state = state,
                                             dispatch = dispatch,
                                             view = shown.view ?: DmtView.FOLDERS,
-                                            tint = field.darkenedForPlayer(),
+                                            tint = field,
                                         )
                                 }
                             }
