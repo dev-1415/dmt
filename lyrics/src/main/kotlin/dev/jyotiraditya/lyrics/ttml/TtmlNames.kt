@@ -2,6 +2,8 @@ package dev.jyotiraditya.lyrics.ttml
 
 /** Element, attribute and value names of Apple-style lyric TTML, matched by local name. */
 internal object TtmlNames {
+    const val TT = "tt"
+    const val BODY = "body"
     const val AGENT = "agent"
     const val DIV = "div"
     const val P = "p"

@@ -6,6 +6,7 @@ import android.util.LruCache
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.jyotiraditya.dmt.data.lyrics.LyricsEmbedder
 import dev.jyotiraditya.dmt.domain.model.LyricsSource
 import dev.jyotiraditya.dmt.library.MetadataReader
 import dev.jyotiraditya.dmt.util.allFilesAccess
@@ -62,9 +63,19 @@ class LyricsRepository @Inject constructor(@param:ApplicationContext private val
     private val cache = LruCache<String, Read>(CACHE_TRACKS * LyricsSource.entries.size)
 
     @OptIn(UnstableApi::class)
-    private suspend fun embeddedLyrics(track: File): Lyrics? =
-        LyricsTags.bestOf(MetadataReader.readTags(context, Uri.fromFile(track)))
-            ?.let(LyricsParser::parse)
+    private suspend fun embeddedLyrics(track: File): Lyrics? {
+        // A standard TTML sidecar carries word timing that the LRC tag cannot.
+        val sidecar = File(track.parentFile, "${track.nameWithoutExtension}.ttml")
+        if (allFilesAccess && sidecar.isFile) {
+            val text = runCatching { sidecar.readText() }.getOrNull()
+            if (text != null) {
+                LyricsParser.parse(text, relativeTtml = LyricsEmbedder.isRelativeTtml(text))
+                    ?.let { return it }
+            }
+        }
+        return LyricsTags.bestOf(MetadataReader.readTags(context, Uri.fromFile(track)))
+            ?.let { LyricsParser.parse(it) }
+    }
 
     /** The lyrics files that may sit next to [track], richest format first. */
     private fun sidecarFiles(track: File): List<File> {
@@ -77,5 +88,7 @@ class LyricsRepository @Inject constructor(@param:ApplicationContext private val
     private fun sidecarLyrics(files: List<File>): Lyrics? = files
         .asSequence()
         .mapNotNull { file -> runCatching { file.readText() }.getOrNull() }
-        .firstNotNullOfOrNull(LyricsParser::parse)
+        .firstNotNullOfOrNull {
+            LyricsParser.parse(it, relativeTtml = LyricsEmbedder.isRelativeTtml(it))
+        }
 }

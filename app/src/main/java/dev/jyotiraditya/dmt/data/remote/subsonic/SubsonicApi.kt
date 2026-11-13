@@ -141,7 +141,7 @@ class SubsonicApi @Inject constructor(private val client: HttpClient, private va
                 .lyrics
                 ?.value
         }
-        return plain?.takeIf { it.isNotBlank() }?.let(LyricsParser::parse)
+        return plain?.takeIf { it.isNotBlank() }?.let { LyricsParser.parse(it) }
     }
 
     /** The result of [block], or null when the server refuses the call or doesn't know it. */

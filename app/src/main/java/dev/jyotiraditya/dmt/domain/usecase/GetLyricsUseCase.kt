@@ -111,7 +111,7 @@ constructor(
                             LyricsSource.LOCAL,
                             -> null
                         }
-                    text?.let(LyricsParser::parse)
+                    text?.let { LyricsParser.parse(it) }
                 }
             }
         // Only hits are kept; a miss is asked again next time.

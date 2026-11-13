@@ -150,17 +150,9 @@ fun SettingsPage(state: DmtState, cover: Color, dispatch: (DmtAction) -> Unit) {
 private fun SettingsHome(state: DmtState, cover: Color, dispatch: (DmtAction) -> Unit) {
     val settings = state.settings
     fun save(next: DmtSettings) = dispatch(DmtAction.Config(next))
-    var pickingAccent by remember { mutableStateOf(false) }
     var pickingStartFolder by remember { mutableStateOf(false) }
     val openEqualizer = rememberEqualizerLauncher()
 
-    if (pickingAccent) {
-        AccentSheet(
-            current = settings.accent,
-            onPick = { save(settings.copy(accent = it)) },
-            onDismiss = { pickingAccent = false },
-        )
-    }
     if (pickingStartFolder) {
         StartFolderSheet(
             roots = state.library.folderRoots,
@@ -273,13 +265,6 @@ private fun SettingsHome(state: DmtState, cover: Color, dispatch: (DmtAction) ->
         }
 
         item { GroupHeading(stringResource(R.string.settings_section_look)) }
-        item {
-            LinkRow(
-                label = stringResource(R.string.settings_accent),
-                value = stringResource(settings.accent.title),
-                onClick = { pickingAccent = true },
-            )
-        }
         item {
             ToggleRow(
                 label = stringResource(R.string.settings_animated_art),

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.R
+import dev.jyotiraditya.dmt.data.lyrics.LyricsEmbedder
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.ui.components.Block
@@ -122,7 +123,17 @@ private fun OffsetTab(state: DmtState, dispatch: (DmtAction) -> Unit) {
         onClick = {
             val shifted = lyrics?.shiftBy(offset.toLong())
             if (shifted != null) {
-                dispatch(DmtAction.SaveLyrics(shifted.toLrc(), raw = true))
+                val shiftedTtml =
+                    lyrics.raw
+                        ?.takeIf { it.trimStart().startsWith("<") }
+                        ?.let { LyricsEmbedder.shiftTtmlTimes(it, offset.toLong()) }
+                dispatch(
+                    DmtAction.SaveLyrics(
+                        shifted.toLrc(),
+                        raw = true,
+                        ttml = shiftedTtml,
+                    )
+                )
                 dispatch(DmtAction.Config(state.settings.copy(lyricsOffsetMs = 0)))
             }
         },

@@ -6,12 +6,12 @@ import dev.jyotiraditya.lyrics.ttml.TtmlParser
 object LyricsParser {
 
     /** The lyrics in [raw], read as TTML, LRC or plain text, or null if it holds none. */
-    fun parse(raw: String): Lyrics? {
+    fun parse(raw: String, relativeTtml: Boolean = false): Lyrics? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
         val parsed =
             when (LyricsFormat.of(trimmed)) {
-                LyricsFormat.TTML -> TtmlParser.parse(trimmed)
+                LyricsFormat.TTML -> TtmlParser.parse(trimmed, relativeTtml)
 
                 LyricsFormat.ENRICHED_LRC,
                 LyricsFormat.WORD_LRC,

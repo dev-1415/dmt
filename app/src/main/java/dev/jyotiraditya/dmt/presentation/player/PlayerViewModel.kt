@@ -355,7 +355,7 @@ constructor(
 
             DmtAction.EmbedLyrics -> embedLyrics()
 
-            is DmtAction.SaveLyrics -> saveLyrics(intent.text, intent.raw)
+            is DmtAction.SaveLyrics -> saveLyrics(intent.text, intent.raw, intent.ttml)
 
             DmtAction.CloseLyricsSources -> reduce { it.copy(lyricsSourcesOpen = false) }
 
@@ -588,9 +588,8 @@ constructor(
         viewModelScope.launch {
             delay(500)
             val standard = currentLyrics.toStandardLrc()
-            val rawTtml = currentLyrics.raw?.takeIf { it.trimStart().startsWith("<") }
-            val rich = rawTtml?.let { "DMT-TTML:$it" } ?: "DMT-LRC:${currentLyrics.toLrc()}"
-            LyricsEmbedder.embed(context, track, standard, rich, rawTtml).fold(
+            val ttml = currentLyrics.raw?.takeIf { it.trimStart().startsWith("<") }
+            LyricsEmbedder.embed(context, track, standard, ttml).fold(
                 onSuccess = {
                     // The file may keep its old size and modified date, so drop the cached lyrics.
                     getLyrics.invalidateLocal(track.path)
@@ -613,7 +612,7 @@ constructor(
     }
 
     /** Writes edited lyrics into the playing track's file, keeping line timing when it can. */
-    private fun saveLyrics(text: String, raw: Boolean) {
+    private fun saveLyrics(text: String, raw: Boolean, ttml: String? = null) {
         val track = currentState.nowPlayingTrack ?: return
         if (track.source != TrackSource.LOCAL || track.path.isBlank()) return
         val c = controller ?: return
@@ -645,14 +644,13 @@ constructor(
             } else {
                 text
             }
-        val parsed = LyricsParser.parse(lrc)
+        val parsed = LyricsParser.parse(lrc, relativeTtml = lrc.contains("<!-- DMT-TTML -->"))
         val standard = parsed?.toStandardLrc() ?: lrc
-        val rich = if (isTtml) "DMT-TTML:$lrc" else "DMT-LRC:$lrc"
-        val ttml = if (isTtml) lrc else null
+        val sidecar = ttml ?: if (isTtml) lrc else null
         c.stop()
         viewModelScope.launch {
             delay(500)
-            LyricsEmbedder.embed(context, track, standard, rich, ttml).fold(
+            LyricsEmbedder.embed(context, track, standard, sidecar).fold(
                 onSuccess = {
                     getLyrics.invalidateLocal(track.path)
                     notify(UiText(R.string.notice_lyrics_embedded))

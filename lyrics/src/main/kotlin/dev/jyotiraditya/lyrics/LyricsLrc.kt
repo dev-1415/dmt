@@ -16,7 +16,7 @@ fun Lyrics.toLrc(): String {
 
 /**
  * This lyrics as plain line-level LRC that any player can read. The rich version, with word
- * timing, translations and backing vocals, goes in a DMT custom tag instead.
+ * timing, translations and backing vocals, goes in the standard TTML sidecar instead.
  */
 fun Lyrics.toStandardLrc(): String {
     if (!synced) return lines.joinToString("\n") { it.text }

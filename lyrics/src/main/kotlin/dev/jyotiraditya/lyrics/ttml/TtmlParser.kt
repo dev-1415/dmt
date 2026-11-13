@@ -24,8 +24,8 @@ import nl.adaptivity.xmlutil.xmlStreaming
 object TtmlParser {
 
     /** The lyrics in [raw], or null if it is not well-formed or holds no lines. */
-    fun parse(raw: String): Lyrics? = try {
-        TtmlDocumentReader(xmlStreaming.newGenericReader(raw)).read()
+    fun parse(raw: String, relative: Boolean = false): Lyrics? = try {
+        TtmlDocumentReader(xmlStreaming.newGenericReader(raw), relative).read()
     } catch (_: XmlException) {
         null
     }
@@ -48,12 +48,19 @@ private class OpenSpan(
     var hasChildSpans = false
 }
 
-private class TtmlDocumentReader(private val xml: XmlReader) {
+private class TtmlDocumentReader(
+    private val xml: XmlReader,
+    private val relative: Boolean,
+) {
     private val singers = Singers()
     private val paragraphs = mutableListOf<Paragraph>()
     private val translations = HashMap<String, MutableList<TimedText>>()
     private val readings = HashMap<String, TimedText>()
 
+    private var rootBegin = 0L
+    private var bodyBegin = 0L
+    private var divBegin = 0L
+    private var paragraphBegin = 0L
     private var sectionAgent: String? = null
     private var sectionStarting = false
 
@@ -61,6 +68,10 @@ private class TtmlDocumentReader(private val xml: XmlReader) {
         while (xml.hasNext()) {
             if (xml.next() != EventType.START_ELEMENT) continue
             when (xml.localName) {
+                TtmlNames.TT -> rootBegin = parseClockTime(attribute(TtmlNames.BEGIN))
+
+                TtmlNames.BODY -> bodyBegin = absolute(rootBegin, attribute(TtmlNames.BEGIN))
+
                 TtmlNames.AGENT ->
                     singers.declare(
                         attribute(TtmlNames.ID),
@@ -68,6 +79,7 @@ private class TtmlDocumentReader(private val xml: XmlReader) {
                     )
 
                 TtmlNames.DIV -> {
+                    divBegin = absolute(bodyBegin, attribute(TtmlNames.BEGIN))
                     sectionStarting = true
                     sectionAgent = attribute(TtmlNames.AGENT)
                 }
@@ -108,8 +120,9 @@ private class TtmlDocumentReader(private val xml: XmlReader) {
 
     /** Reads the `<p>` the reader is at through its end, or null if it holds no text. */
     private fun readParagraph(): Paragraph? {
-        val beginMs = parseClockTime(attribute(TtmlNames.BEGIN))
-        val endMs = parseClockTime(attribute(TtmlNames.END))
+        val beginMs = absolute(divBegin, attribute(TtmlNames.BEGIN))
+        val endMs = absolute(divBegin, attribute(TtmlNames.END))
+        paragraphBegin = beginMs
         val key = attribute(TtmlNames.KEY)
         val agent = attribute(TtmlNames.AGENT) ?: sectionAgent
         val voice = singers.voiceOf(agent)
@@ -154,10 +167,12 @@ private class TtmlDocumentReader(private val xml: XmlReader) {
                         val parent = spans.lastOrNull()
                         parent?.hasChildSpans = true
                         text.flushSpace()
+                        val parentBegin =
+                            parent?.beginMs?.takeIf { it >= 0 } ?: paragraphBegin
                         spans.addLast(
                             OpenSpan(
-                                beginMs = parseClockTime(attribute(TtmlNames.BEGIN)),
-                                endMs = parseClockTime(attribute(TtmlNames.END)),
+                                beginMs = absolute(parentBegin, attribute(TtmlNames.BEGIN)),
+                                endMs = absolute(parentBegin, attribute(TtmlNames.END)),
                                 textStart = text.length,
                                 background =
                                     parent?.background == true || role == TtmlNames.ROLE_BACKGROUND,
@@ -192,11 +207,27 @@ private class TtmlDocumentReader(private val xml: XmlReader) {
 
         val lineText = text.toString()
         if (lineText.isEmpty()) return null
+        val wordStart = words.minOfOrNull { it.startMs }
+        val wordEnd = words.maxOfOrNull { it.endMs }
+        val start =
+            when {
+                beginMs >= 0 && wordStart != null -> minOf(beginMs, wordStart)
+                beginMs >= 0 -> beginMs
+                wordStart != null -> wordStart
+                else -> LyricLine.UNTIMED
+            }
+        val end =
+            when {
+                endMs >= 0 && wordEnd != null -> maxOf(endMs, wordEnd)
+                endMs >= 0 -> endMs
+                wordEnd != null -> wordEnd
+                else -> LyricLine.UNTIMED
+            }
         return Paragraph(
             line =
                 LyricLine(
-                    startMs = minOf(beginMs, words.minOfOrNull { it.startMs } ?: beginMs),
-                    endMs = maxOf(endMs, words.maxOfOrNull { it.endMs } ?: endMs),
+                    startMs = start,
+                    endMs = end,
                     text = lineText,
                     words = words,
                     voice = voice,
@@ -339,4 +370,12 @@ private class TtmlDocumentReader(private val xml: XmlReader) {
     private fun attribute(localName: String): String? = (0 until xml.attributeCount)
         .firstOrNull { xml.getAttributeLocalName(it) == localName }
         ?.let { xml.getAttributeValue(it) }
+
+    /** [value] as an absolute time: relative TTML adds the parent's begin, absolute does not. */
+    private fun absolute(parent: Long, value: String?): Long {
+        val parsed = parseClockTime(value)
+        if (!relative) return parsed
+        if (parsed == LyricLine.UNTIMED) return LyricLine.UNTIMED
+        return (if (parent == LyricLine.UNTIMED) 0L else parent) + parsed
+    }
 }

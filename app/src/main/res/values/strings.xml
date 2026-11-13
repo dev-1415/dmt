@@ -288,7 +288,6 @@
     <string name="settings_stop_on_dismiss">Stop when closed</string>
     <string name="settings_stop_on_dismiss_hint">End playback when dmt is swiped away</string>
     <string name="settings_equalizer">Equalizer</string>
-    <string name="settings_accent">Accent</string>
     <string name="settings_animated_art">Animated covers</string>
     <string name="settings_animated_art_hint">Play motion artwork where an album has it</string>
     <string name="settings_animated_art_info">Motion covers come from an online artwork service. Each one streams whenever it plays and is never saved on your device, so it uses data every time. Turn this off to keep covers still and offline.</string>

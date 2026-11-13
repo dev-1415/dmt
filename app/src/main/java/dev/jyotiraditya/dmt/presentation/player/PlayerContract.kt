@@ -215,7 +215,11 @@ sealed interface DmtAction {
     data object EmbedLyrics : DmtAction
 
     /** Writes edited lyrics into the playing track's file. */
-    data class SaveLyrics(val text: String, val raw: Boolean = false) : DmtAction
+    data class SaveLyrics(
+        val text: String,
+        val raw: Boolean = false,
+        val ttml: String? = null,
+    ) : DmtAction
 
     data object CloseLyricsSources : DmtAction
 
