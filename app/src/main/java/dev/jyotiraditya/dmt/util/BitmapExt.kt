@@ -1,5 +1,6 @@
 package dev.jyotiraditya.dmt.util
 
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.ui.graphics.Color
@@ -49,6 +50,7 @@ fun Bitmap.fitWithin(max: Int): Bitmap {
  * The scheme is always generated dark. DynamicColors chooses light or dark from the context
  * theme, which is unreliable for an application context and produced a pale olive page.
  */
+@SuppressLint("RestrictedApi") // Material's quantizer has no public entry point.
 suspend fun Bitmap.contentFieldColor(): Color =
     withContext(Dispatchers.Default) {
         val sample = fitWithin(128)
@@ -76,6 +78,7 @@ suspend fun Bitmap.contentFieldColor(): Color =
  * The full Material You scheme generated from this cover, always dark. [CoverColors.surface] is
  * the page colour; the primary roles drive the play button, seek bar and live lyric.
  */
+@SuppressLint("RestrictedApi") // Material's quantizer has no public entry point.
 suspend fun Bitmap.contentColors(): CoverColors =
     withContext(Dispatchers.Default) {
         val sample = fitWithin(128)

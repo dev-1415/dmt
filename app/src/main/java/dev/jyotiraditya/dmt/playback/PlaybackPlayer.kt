@@ -12,6 +12,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -20,6 +21,7 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.AudioTrackAudioOutputProvider
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -31,8 +33,13 @@ private const val SEEK_HOLD_STEP_MS = 5_000L
  * are expensive. Report them as unavailable so ExoPlayer falls through to the bundled FFmpeg
  * renderer, while AAC keeps the platform decoder and compressed offload.
  */
-private val preferFfmpegForSoftware =
-    MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+@OptIn(UnstableApi::class)
+private object SoftwareCodecSelector : MediaCodecSelector {
+    override fun getDecoderInfos(
+        mimeType: String,
+        requiresSecureDecoder: Boolean,
+        requiresTunnelingDecoder: Boolean,
+    ): List<MediaCodecInfo> =
         if (mimeType == MimeTypes.AUDIO_VORBIS || mimeType == MimeTypes.AUDIO_OPUS) {
             emptyList()
         } else {
@@ -42,10 +49,10 @@ private val preferFfmpegForSoftware =
                 requiresTunnelingDecoder,
             )
         }
-    }
+}
 
 /** A deep PCM buffer and the power-saving AudioTrack path. */
-@OptIn(UnstableApi::class)
+@OptIn(UnstableApi::class, ExperimentalApi::class)
 private class PowerSavingRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
     override fun buildAudioSink(
         context: Context,
@@ -172,7 +179,7 @@ internal fun Context.buildMusicPlayer(dataSourceFactory: DataSource.Factory): Ex
         PowerSavingRenderersFactory(this)
             // Platform decoders are more power-efficient; extensions only fill the gaps.
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-            .setMediaCodecSelector(preferFfmpegForSoftware)
+            .setMediaCodecSelector(SoftwareCodecSelector)
             .setEnableDecoderFallback(true)
     val offload =
         AudioOffloadPreferences.Builder()

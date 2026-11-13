@@ -246,6 +246,7 @@ class PlaybackService : MediaLibraryService() {
      * Starts the media foreground service while the app is visible. Android 17 only grants the
      * while-in-use capability needed for background audio to services promoted from the foreground.
      */
+    @OptIn(UnstableApi::class)
     private fun startForegroundForPlayback() {
         val channel =
             NotificationChannelCompat.Builder(
