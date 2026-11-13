@@ -214,6 +214,9 @@ sealed interface DmtAction {
     /** Writes the lyrics on screen into the playing track's file. */
     data object EmbedLyrics : DmtAction
 
+    /** Writes edited lyrics into the playing track's file. */
+    data class SaveLyrics(val text: String, val raw: Boolean = false) : DmtAction
+
     data object CloseLyricsSources : DmtAction
 
     data class SetLyricsSource(val source: LyricsSource) : DmtAction

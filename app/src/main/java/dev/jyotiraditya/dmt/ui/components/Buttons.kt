@@ -25,7 +25,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.ui.theme.Ink
-import dev.jyotiraditya.dmt.ui.theme.LocalAccent
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.Surface2
 
@@ -35,8 +35,8 @@ fun Block(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    fill: Color = LocalAccent.current.fill,
-    ink: Color = LocalAccent.current.onFill,
+    fill: Color = LocalCoverColors.current.primary,
+    ink: Color = LocalCoverColors.current.onPrimary,
     @DrawableRes icon: Int? = null,
     enabled: Boolean = true,
 ) {
@@ -109,9 +109,9 @@ fun WordToggle(
 /** A square switch, drawn only; the row holding it handles the tap. */
 @Composable
 fun Toggle(checked: Boolean, modifier: Modifier = Modifier) {
-    val accent = LocalAccent.current
-    val track by animateColorAsState(if (checked) accent.fill else Surface2, label = "toggleTrack")
-    val thumb by animateColorAsState(if (checked) accent.onFill else Muted, label = "toggleThumb")
+    val accent = LocalCoverColors.current
+    val track by animateColorAsState(if (checked) accent.primary else Surface2, label = "toggleTrack")
+    val thumb by animateColorAsState(if (checked) accent.onPrimary else Muted, label = "toggleThumb")
     Switch(
         checked = checked,
         onCheckedChange = null,

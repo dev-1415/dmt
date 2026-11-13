@@ -14,6 +14,15 @@ fun Lyrics.toLrc(): String {
     }
 }
 
+/**
+ * This lyrics as plain line-level LRC that any player can read. The rich version, with word
+ * timing, translations and backing vocals, goes in a DMT custom tag instead.
+ */
+fun Lyrics.toStandardLrc(): String {
+    if (!synced) return lines.joinToString("\n") { it.text }
+    return lines.joinToString("\n") { line -> "[${line.startMs.lrcTime()}]${line.text}" }
+}
+
 private fun LyricLine.lrcLine(): String {
     val stamp = "[${startMs.lrcTime()}]"
     // A secondary line keeps its side after the round trip; primary is the default.

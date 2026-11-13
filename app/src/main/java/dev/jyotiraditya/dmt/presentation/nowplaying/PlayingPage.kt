@@ -312,7 +312,7 @@ private fun SeekRow(state: DmtState, player: Player, field: Color, ink: Color, d
                 modifier = Modifier.align(Alignment.Center),
             )
             Text(
-                text = "−" + (state.durationMs - shown).coerceAtLeast(0).asTime(),
+                text = state.durationMs.asTime(),
                 style = Numerals,
                 color = dim,
                 modifier = Modifier.align(Alignment.CenterEnd),

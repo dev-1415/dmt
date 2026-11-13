@@ -31,10 +31,19 @@ import kotlin.coroutines.resume
 
 private const val TAG = "LyricsEmbedder"
 
+/** Marks a TTML sidecar this app wrote, so an edited LRC can remove only our own file. */
+private const val TTML_MARKER = "<!-- DMT-TTML -->"
+
 /** Writes lyrics into a local track's tags, replacing any lyrics already embedded. */
 object LyricsEmbedder {
 
-    suspend fun embed(context: Context, track: Track, lyrics: String): Result<Unit> =
+    suspend fun embed(
+        context: Context,
+        track: Track,
+        lyrics: String,
+        rich: String? = null,
+        ttml: String? = null,
+    ): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 require(track.source == TrackSource.LOCAL) { "Only local tracks can be edited" }
@@ -71,7 +80,7 @@ object LyricsEmbedder {
                     file.copyTo(source, overwrite = true)
                     if (modified > 0L) source.setLastModified(modified)
                     sourceReady = true
-                    val tag = writeLyrics(context, source, destination, format, lyrics)
+                    val tag = writeLyrics(context, source, destination, format, lyrics, rich)
                     require(destination.isFile && headerMatches(destination, format)) {
                         "The rewritten file is not readable"
                     }
@@ -83,6 +92,12 @@ object LyricsEmbedder {
                     destination.delete()
                     runCatching { if (modified > 0L) file.setLastModified(modified) }
                     source.delete()
+                    // TTML-aware players read a sidecar; the standard LRC tag covers the rest.
+                    if (ttml != null) {
+                        runCatching { writeTtmlSidecar(file, ttml) }
+                    } else {
+                        runCatching { deleteTtmlSidecar(file) }
+                    }
                     // The scan may lose tags for some formats, so the refresh puts them back.
                     runCatching { scanAndRefresh(context, file, track, tag, modified) }
                     if (BuildConfig.DEBUG) {
@@ -130,6 +145,30 @@ object LyricsEmbedder {
             }
         }
 
+    /** Writes the raw TTML beside the track, marked so an edited LRC can remove only our file. */
+    private fun writeTtmlSidecar(file: File, ttml: String) {
+        val marked =
+            if (ttml.startsWith("<?xml")) {
+                val end = ttml.indexOf("?>")
+                if (end >= 0) {
+                    ttml.substring(0, end + 2) + "\n" + TTML_MARKER + "\n" + ttml.substring(end + 2)
+                } else {
+                    "$TTML_MARKER\n$ttml"
+                }
+            } else {
+                "$TTML_MARKER\n$ttml"
+            }
+        File(file.parentFile, "${file.nameWithoutExtension}.ttml").writeText(marked)
+    }
+
+    /** Removes the TTML sidecar only when this app wrote it. */
+    private fun deleteTtmlSidecar(file: File) {
+        val sidecar = File(file.parentFile, "${file.nameWithoutExtension}.ttml")
+        if (!sidecar.isFile) return
+        val ours = runCatching { sidecar.readText().contains(TTML_MARKER) }.getOrDefault(false)
+        if (ours) sidecar.delete()
+    }
+
     /** Reads [source], writes the lyrics, and returns the tag that was written. */
     private fun writeLyrics(
         context: Context,
@@ -137,6 +176,7 @@ object LyricsEmbedder {
         destination: File,
         format: String,
         lyrics: String,
+        rich: String?,
     ): Tag {
         // These writers edit the file in place, so they work on the destination copy.
         val inPlace =
@@ -168,6 +208,18 @@ object LyricsEmbedder {
         tag.setField(tag.createField(FieldKey.LYRICS, lyrics))
         // Keep the comment header small enough for MediaStore and Media3 to read it.
         if (tag.hasField("UNSYNCEDLYRICS")) tag.deleteField("UNSYNCEDLYRICS")
+        // Keep the rich lyrics (word timing, translations, backing vocals) in a custom field,
+        // so the standard LYRICS tag stays plain LRC that other players can read.
+        // Never clobber a CUSTOM1 field the file already used for something else.
+        val existingCustom = runCatching { tag.getFirst(FieldKey.CUSTOM1) }.getOrNull()
+        if (existingCustom.isNullOrBlank() || existingCustom.startsWith("DMT-")) {
+            runCatching { tag.deleteField(FieldKey.CUSTOM1) }
+            if (rich != null) {
+                runCatching {
+                    tag.setField(tag.createField(FieldKey.CUSTOM1, rich))
+                }
+            }
+        }
         when {
             format == "mp3" -> MP3FileWriter().writeFile(audio)
             inPlace -> AudioFileIO.write(audio)

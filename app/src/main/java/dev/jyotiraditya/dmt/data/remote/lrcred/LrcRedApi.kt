@@ -8,6 +8,8 @@ import dev.jyotiraditya.dmt.domain.model.UNKNOWN_ALBUM
 import dev.jyotiraditya.dmt.domain.model.UNKNOWN_ARTIST
 import dev.jyotiraditya.dmt.domain.model.UNKNOWN_TITLE
 import dev.jyotiraditya.dmt.domain.model.primaryArtist
+import dev.jyotiraditya.dmt.domain.model.searchArtist
+import dev.jyotiraditya.dmt.domain.model.searchTitle
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -52,23 +54,32 @@ class LrcRedApi @Inject constructor(private val client: HttpClient, private val 
     suspend fun fetchLyrics(track: Track): String? {
         val title = track.title.knownOrNull(UNKNOWN_TITLE) ?: return null
         val artist = track.primaryArtist.knownOrNull(UNKNOWN_ARTIST) ?: return null
-
-        val search =
-            client.get("$BASE_URL/search.json") {
-                parameter("q", "$artist $title")
-                header(HttpHeaders.UserAgent, DMT_USER_AGENT)
-            }
-        if (!search.found()) return null
-        val hits = json.decodeFromString<LrcRedSearch>(search.bodyAsText()).hits
+        val searchTitle = track.searchTitle
+        val searchArtist = track.searchArtist
         val album = track.album.knownOrNull(UNKNOWN_ALBUM)
-        val hit = bestMatch(hits, title, artist, track.durationMs, album) ?: return null
+        // Catalogues usually index one artist, so try the first collaborator before the full
+        // credit, then the title alone for tags whose artist is written very differently.
+        val queries =
+            listOf("$searchArtist $searchTitle", "$artist $searchTitle", searchTitle)
+                .distinct()
+        for (query in queries) {
+            val search =
+                client.get("$BASE_URL/search.json") {
+                    parameter("q", query)
+                    header(HttpHeaders.UserAgent, DMT_USER_AGENT)
+                }
+            if (!search.found()) continue
+            val hits = json.decodeFromString<LrcRedSearch>(search.bodyAsText()).hits
+            val hit = bestMatch(hits, searchTitle, searchArtist, track.durationMs, album) ?: continue
 
-        val lyrics =
-            client.get("$BASE_URL/s/${hit.isrc}.ttml") {
-                header(HttpHeaders.UserAgent, DMT_USER_AGENT)
-            }
-        if (!lyrics.found()) return null
-        return lyrics.bodyAsText().ifBlank { null }
+            val lyrics =
+                client.get("$BASE_URL/s/${hit.isrc}.ttml") {
+                    header(HttpHeaders.UserAgent, DMT_USER_AGENT)
+                }
+            if (!lyrics.found()) continue
+            return lyrics.bodyAsText().ifBlank { null }
+        }
+        return null
     }
 }
 

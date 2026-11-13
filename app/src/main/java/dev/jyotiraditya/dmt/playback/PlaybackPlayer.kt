@@ -61,15 +61,20 @@ private class PowerSavingRenderersFactory(context: Context) : DefaultRenderersFa
     ): AudioSink {
         val output =
             AudioTrackAudioOutputProvider.Builder(context)
-                .setAudioTrackBufferSizeProvider { minBuffer, maxBuffer, outputMode, pcmFrameSize, sampleRate, _, _ ->
+                .setAudioTrackBufferSizeProvider { minBuffer, _, outputMode, pcmFrameSize, sampleRate, bitrate, _ ->
                     if (outputMode == DefaultAudioSink.OUTPUT_MODE_OFFLOAD) {
-                        // A deeper offload buffer gives the app more time to refill the DSP.
-                        val target = minBuffer.toLong() * 2
-                        (if (maxBuffer > 0) target.coerceAtMost(maxBuffer.toLong()) else target)
-                            .toInt()
+                        // About 3 seconds of compressed audio, with a floor of the device minimum.
+                        val target =
+                            if (bitrate > 0) {
+                                (bitrate.toLong() * 3 / 8).coerceAtLeast(minBuffer.toLong())
+                            } else {
+                                minBuffer.toLong() * 24
+                            }
+                        Log.i("DmtAudio", "offload buffer min=$minBuffer bitrate=$bitrate -> $target")
+                        target.toInt()
                     } else if (outputMode == DefaultAudioSink.OUTPUT_MODE_PCM && pcmFrameSize > 0) {
-                        // About 250 ms of PCM, rounded to a whole frame.
-                        val target = sampleRate.toLong() * pcmFrameSize / 4
+                        // About 500 ms of PCM, rounded to a whole frame.
+                        val target = sampleRate.toLong() * pcmFrameSize / 2
                         maxOf(minBuffer.toLong(), target / pcmFrameSize * pcmFrameSize).toInt()
                     } else {
                         minBuffer
@@ -112,8 +117,9 @@ private class PowerSavingRenderersFactory(context: Context) : DefaultRenderersFa
 internal fun Player.applyOffloadPolicy(mediaItem: MediaItem?) {
     val path = mediaItem?.localConfiguration?.tag as? String ?: return
     val extension = path.substringAfterLast('.', "").lowercase()
-    // Debug: test MP3 offload with the deeper buffer and event logging.
-    val offload = true
+    // Offload is the efficient path; the deeper buffer and the normal performance mode keep
+    // the DSP fed. Opus and Vorbis are not exposed to apps for offload on this device.
+    val offload = extension != "opus" && extension != "ogg"
     val gapless = extension != "opus" && extension != "ogg"
     val mode =
         if (offload) {

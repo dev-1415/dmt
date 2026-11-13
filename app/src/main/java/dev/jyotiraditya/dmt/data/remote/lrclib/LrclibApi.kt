@@ -7,6 +7,8 @@ import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.model.UNKNOWN_ALBUM
 import dev.jyotiraditya.dmt.domain.model.UNKNOWN_ARTIST
 import dev.jyotiraditya.dmt.domain.model.UNKNOWN_TITLE
+import dev.jyotiraditya.dmt.domain.model.searchArtist
+import dev.jyotiraditya.dmt.domain.model.searchTitle
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -36,18 +38,25 @@ class LrclibApi @Inject constructor(private val client: HttpClient, private val 
         val title = track.title.knownOrNull(UNKNOWN_TITLE) ?: return null
         val artist = track.artist.knownOrNull(UNKNOWN_ARTIST) ?: return null
         val album = track.album.knownOrNull(UNKNOWN_ALBUM)
-
-        val response =
-            client.get(BASE_URL) {
-                parameter("track_name", title)
-                parameter("artist_name", artist)
-                album?.let { parameter("album_name", it) }
-                parameter("duration", track.durationMs / 1000)
-                header(HttpHeaders.UserAgent, DMT_USER_AGENT)
-            }
-        if (!response.found()) return null
-        val lyrics = json.decodeFromString<LrclibLyrics>(response.bodyAsText())
-        if (lyrics.instrumental) return null
-        return lyrics.syncedLyrics?.ifBlank { null } ?: lyrics.plainLyrics?.ifBlank { null }
+        val searchTitle = track.searchTitle
+        val searchArtist = track.searchArtist
+        // The strict endpoint wants one artist, so try the first collaborator before the credit.
+        val artists = listOf(searchArtist, artist).distinct()
+        for (candidate in artists) {
+            val response =
+                client.get(BASE_URL) {
+                    parameter("track_name", searchTitle)
+                    parameter("artist_name", candidate)
+                    album?.let { parameter("album_name", it) }
+                    parameter("duration", track.durationMs / 1000)
+                    header(HttpHeaders.UserAgent, DMT_USER_AGENT)
+                }
+            if (!response.found()) continue
+            val lyrics = json.decodeFromString<LrclibLyrics>(response.bodyAsText())
+            if (lyrics.instrumental) continue
+            val text = lyrics.syncedLyrics?.ifBlank { null } ?: lyrics.plainLyrics?.ifBlank { null }
+            if (text != null) return text
+        }
+        return null
     }
 }

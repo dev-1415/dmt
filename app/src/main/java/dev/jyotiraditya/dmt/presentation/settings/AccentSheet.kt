@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.R
@@ -44,7 +43,6 @@ internal val AccentColor.title: Int
             AccentColor.PURPLE -> R.string.accent_purple
             AccentColor.MONO -> R.string.accent_mono
             AccentColor.WALLPAPER -> R.string.accent_wallpaper
-            AccentColor.COVER -> R.string.accent_cover
         }
 
 @get:StringRes
@@ -52,7 +50,6 @@ private val AccentColor.hint: Int?
     get() =
         when (this) {
             AccentColor.WALLPAPER -> R.string.accent_wallpaper_hint
-            AccentColor.COVER -> R.string.accent_cover_hint
             else -> null
         }
 
@@ -60,11 +57,10 @@ private val AccentColor.hint: Int?
 private val offeredAccents: List<AccentColor>
     get() = AccentColor.entries.filter { it != AccentColor.WALLPAPER || wallpaperAccentAvailable }
 
-/** Every accent with a swatch of its colours; [cover] previews the cover accent. */
+/** Every accent with a swatch of its colours. */
 @Composable
 internal fun AccentSheet(
     current: AccentColor,
-    cover: Color,
     onPick: (AccentColor) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -73,7 +69,7 @@ internal fun AccentSheet(
         offeredAccents.forEach { choice ->
             AccentRow(
                 choice = choice,
-                colors = accentFor(choice, cover),
+                colors = accentFor(choice),
                 chosen = choice == current,
                 onClick = {
                     onPick(choice)

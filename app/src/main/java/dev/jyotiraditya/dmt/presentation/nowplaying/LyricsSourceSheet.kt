@@ -10,6 +10,10 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +24,8 @@ import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.LyricsSource
 import dev.jyotiraditya.dmt.domain.model.LyricsTiming
 import dev.jyotiraditya.dmt.presentation.nowplaying.lyrics.label
+import dev.jyotiraditya.dmt.presentation.player.DmtAction
+import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.player.LyricsSourceStatus
 import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.SelectionMark
@@ -31,11 +37,12 @@ import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
-import dev.jyotiraditya.dmt.ui.theme.rowFill
 
 /** Picks where lyrics come from, tagging each source with what it has for the track. */
 @Composable
 fun LyricsSourceSheet(
+    state: DmtState,
+    dispatch: (DmtAction) -> Unit,
     trackTitle: String,
     current: LyricsSource,
     sources: Map<LyricsSource, LyricsSourceStatus>,
@@ -44,6 +51,10 @@ fun LyricsSourceSheet(
     onEmbed: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var offsetOpen by remember { mutableStateOf(false) }
+    if (offsetOpen) {
+        LyricsOffsetSheet(state, dispatch, onDismiss = { offsetOpen = false })
+    }
     DmtSheet(onDismiss = onDismiss) {
         val scheme = LocalCoverColors.current
         SheetHeader(
@@ -52,20 +63,22 @@ fun LyricsSourceSheet(
             titleColor = scheme.primary,
         )
         Column(modifier = Modifier.selectableGroup()) {
-            LyricsSource.entries.forEachIndexed { index, source ->
-                val status = sources[source]
-                SourceRow(
-                    label = stringResource(source.label),
-                    detail = stringResource(source.hint),
-                    tag = stringResource(status.tag(source)),
-                    chosen = source == current,
-                    fill = if (index % 2 == 0) scheme.surface else scheme.surfaceContainer,
-                    mark = if (index % 2 == 0) scheme.surfaceContainer else scheme.surface,
-                    // Online sources stay pickable; a miss may have been a network error.
-                    enabled = source.online || status is LyricsSourceStatus.Found,
-                    onClick = { onPick(source) },
-                )
-            }
+            LyricsSource.entries
+                .filter { it != LyricsSource.LOCAL }
+                .forEachIndexed { index, source ->
+                    val status = sources[source]
+                    SourceRow(
+                        label = stringResource(source.label),
+                        detail = stringResource(source.hint),
+                        tag = stringResource(status.tag(source)),
+                        chosen = source == current,
+                        fill = if (index % 2 == 0) scheme.surface else scheme.surfaceContainer,
+                        mark = if (index % 2 == 0) scheme.surfaceContainer else scheme.surface,
+                        // Online sources stay pickable; a miss may have been a network error.
+                        enabled = source.online || status is LyricsSourceStatus.Found,
+                        onClick = { onPick(source) },
+                    )
+                }
         }
         if (canEmbed) {
             SheetAction(
@@ -77,6 +90,11 @@ fun LyricsSourceSheet(
                 },
             )
         }
+        SheetAction(
+            icon = DmtIcons.Lyrics,
+            label = stringResource(R.string.lyrics_edit_title),
+            onClick = { offsetOpen = true },
+        )
     }
 }
 
@@ -112,11 +130,11 @@ private fun SourceRow(
                 Text(
                     text = tag,
                     style = MaterialTheme.typography.labelSmall,
-                    color = scheme.onPrimaryContainer,
+                    color = scheme.onSurfaceVariant,
                     maxLines = 1,
                     modifier =
                         Modifier.padding(start = 8.dp)
-                            .background(scheme.primaryContainer)
+                            .background(scheme.onSurfaceVariant.copy(alpha = 0.14f))
                             .padding(horizontal = 6.dp, vertical = 3.dp),
                 )
             }

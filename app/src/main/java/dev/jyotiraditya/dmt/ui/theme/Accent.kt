@@ -8,10 +8,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import dev.jyotiraditya.dmt.domain.model.AccentColor
-import android.graphics.Color as PlatformColor
 
 /** An accent: [fill] for buttons and toggles, [onFill] on it, [highlight] on the ground. */
 @Immutable data class Accent(val fill: Color, val onFill: Color, val highlight: Color)
@@ -35,9 +33,9 @@ val LocalAccent = compositionLocalOf { GreenAccent }
 val wallpaperAccentAvailable: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-/** The colours of [choice]; [cover] is the colour of the cover playing now. */
+/** The colours of [choice]. */
 @Composable
-fun accentFor(choice: AccentColor, cover: Color): Accent = when (choice) {
+fun accentFor(choice: AccentColor): Accent = when (choice) {
     AccentColor.GREEN,
     AccentColor.BLUE,
     AccentColor.RED,
@@ -47,8 +45,6 @@ fun accentFor(choice: AccentColor, cover: Color): Accent = when (choice) {
     -> FixedAccents.getValue(choice)
 
     AccentColor.WALLPAPER -> wallpaperAccent()
-
-    AccentColor.COVER -> remember(cover) { Accent(cover, cover.inkOn(), cover.pale()) }
 }
 
 @Composable
@@ -59,13 +55,4 @@ private fun wallpaperAccent(): Accent {
         val scheme = dynamicDarkColorScheme(context)
         Accent(fill = scheme.primary, onFill = scheme.onPrimary, highlight = scheme.primary)
     }
-}
-
-/** A pale tint of this colour's hue, readable on the dark ground. */
-private fun Color.pale(): Color {
-    val hsv = FloatArray(3)
-    PlatformColor.colorToHSV(toArgb(), hsv)
-    hsv[1] = hsv[1].coerceAtMost(0.28f)
-    hsv[2] = 0.94f
-    return Color(PlatformColor.HSVToColor(hsv))
 }

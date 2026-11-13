@@ -12,6 +12,7 @@ import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.TrackGroupArray
 import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.metadata.id3.CommentFrame
 import androidx.media3.extractor.metadata.id3.InternalFrame
 import androidx.media3.extractor.metadata.id3.TextInformationFrame
 import androidx.media3.extractor.metadata.vorbis.VorbisComment
@@ -77,7 +78,20 @@ object MetadataReader {
     private fun Metadata.Entry.tag(): Pair<String, String>? = when (this) {
         is VorbisComment -> key to value
 
-        is InternalFrame -> description.uppercase() to text
+        is InternalFrame ->
+            if (description.contains("CUSTOM1", ignoreCase = true)) {
+                "CUSTOM1" to text
+            } else {
+                description.uppercase() to text
+            }
+
+        // jaudiotagger writes FieldKey.CUSTOM1 as this comment frame on ID3v2.3.
+        is CommentFrame ->
+            if (description.equals("Songs-DB_Custom1", ignoreCase = true)) {
+                "CUSTOM1" to text
+            } else {
+                null
+            }
 
         is TextInformationFrame ->
             when (id) {

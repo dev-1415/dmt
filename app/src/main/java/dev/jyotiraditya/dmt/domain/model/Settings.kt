@@ -106,9 +106,6 @@ enum class AccentColor {
 
     /** The system's colours, taken from the wallpaper. */
     WALLPAPER,
-
-    /** The colour of the cover playing now. */
-    COVER,
 }
 
 data class DmtSettings(
@@ -116,6 +113,8 @@ data class DmtSettings(
     val normalizeVolume: Boolean = false,
     val romanizedLyrics: Boolean = false,
     val singerColors: Boolean = true,
+    /** How far lyrics are shifted from the audio, in milliseconds; positive delays them. */
+    val lyricsOffsetMs: Int = 0,
     val animatedArt: Boolean = false,
     val lyricsSource: LyricsSource = LyricsSource.DEFAULT,
     val stopOnDismiss: Boolean = false,

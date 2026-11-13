@@ -245,7 +245,12 @@ fun DmtScreen(
                 go(next)
             }
             if (!rail) {
-                if (back != null && place != Place.FOLDERS && place != Place.PLAYLISTS) {
+                if (
+                    back != null &&
+                        place != Place.FOLDERS &&
+                        place != Place.PLAYLISTS &&
+                        place != Place.ALBUMS
+                ) {
                     BackBar(label = back.label, field = field, onBack = ::goBack)
                 } else {
                     Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
@@ -267,7 +272,7 @@ fun DmtScreen(
                     if (rail) {
                         Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
                         AnimatedContent(
-                            targetState = back?.label,
+                            targetState = back?.label.takeIf { place != Place.ALBUMS },
                             transitionSpec = {
                                 fadeIn(tween(FADE_MS)) togetherWith fadeOut(tween(FADE_MS))
                             },
@@ -386,6 +391,8 @@ fun DmtScreen(
         if (state.lyricsSourcesOpen) {
             val track = state.nowPlayingTrack
             LyricsSourceSheet(
+                state = state,
+                dispatch = dispatch,
                 trackTitle = state.title,
                 current = state.lyricsShowingFrom ?: state.lyricsSource,
                 sources = state.lyricsSources,

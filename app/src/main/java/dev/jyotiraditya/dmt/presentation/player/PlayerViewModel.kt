@@ -43,7 +43,9 @@ import dev.jyotiraditya.dmt.util.removeFromQueue
 import dev.jyotiraditya.dmt.util.resolveQueue
 import dev.jyotiraditya.dmt.util.suspendRunCatching
 import dev.jyotiraditya.dmt.util.toQueueRequest
+import dev.jyotiraditya.lyrics.LyricsParser
 import dev.jyotiraditya.lyrics.toLrc
+import dev.jyotiraditya.lyrics.toStandardLrc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -353,6 +355,8 @@ constructor(
 
             DmtAction.EmbedLyrics -> embedLyrics()
 
+            is DmtAction.SaveLyrics -> saveLyrics(intent.text, intent.raw)
+
             DmtAction.CloseLyricsSources -> reduce { it.copy(lyricsSourcesOpen = false) }
 
             is DmtAction.SetLyricsSource -> lyrics.choose(intent.source, c?.currentMediaItem)
@@ -572,7 +576,7 @@ constructor(
     /** Writes the lyrics on screen into the playing track's file, replacing any embedded ones. */
     private fun embedLyrics() {
         val track = currentState.nowPlayingTrack ?: return
-        val lyrics = currentState.lyrics ?: return
+        val currentLyrics = currentState.lyrics ?: return
         if (track.source != TrackSource.LOCAL || track.path.isBlank()) return
         val c = controller ?: return
         val items = (0 until c.mediaItemCount).map { c.getMediaItemAt(it) }
@@ -583,17 +587,80 @@ constructor(
         c.stop()
         viewModelScope.launch {
             delay(500)
-            LyricsEmbedder.embed(context, track, lyrics.toLrc()).fold(
+            val standard = currentLyrics.toStandardLrc()
+            val rawTtml = currentLyrics.raw?.takeIf { it.trimStart().startsWith("<") }
+            val rich = rawTtml?.let { "DMT-TTML:$it" } ?: "DMT-LRC:${currentLyrics.toLrc()}"
+            LyricsEmbedder.embed(context, track, standard, rich, rawTtml).fold(
                 onSuccess = {
                     // The file may keep its old size and modified date, so drop the cached lyrics.
                     getLyrics.invalidateLocal(track.path)
                     notify(UiText(R.string.notice_lyrics_embedded))
                     // Re-read the file's tags so the library shows the same title and artist.
                     scan(refresh = true)
+                    // Show the newly embedded lyrics at once, not the old ones.
+                    lyrics.load(c.currentMediaItem)
                 },
                 onFailure = {
                     reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
                     // A failed write may still have changed MediaStore, so read the tags again.
+                    scan(refresh = true)
+                },
+            )
+            c.setMediaItems(items, index, position)
+            c.prepare()
+            if (wasPlaying) c.play()
+        }
+    }
+
+    /** Writes edited lyrics into the playing track's file, keeping line timing when it can. */
+    private fun saveLyrics(text: String, raw: Boolean) {
+        val track = currentState.nowPlayingTrack ?: return
+        if (track.source != TrackSource.LOCAL || track.path.isBlank()) return
+        val c = controller ?: return
+        val items = (0 until c.mediaItemCount).map { c.getMediaItemAt(it) }
+        val index = c.currentMediaItemIndex
+        val position = c.currentPosition
+        val wasPlaying = c.isPlaying
+        val original = currentState.lyrics
+        val edited = text.lines().map { it.trimEnd() }
+        // Keep the original line and word timing when the edit has the same number of lines.
+        // A line whose words changed loses its word timing, but the others keep theirs.
+        val isTtml = raw && text.trimStart().startsWith("<")
+        val lrc =
+            if (!raw && original != null && edited.size == original.lines.size) {
+                val lines =
+                    original.lines.mapIndexed { i, line ->
+                        if (edited[i] == line.text) {
+                            line
+                        } else {
+                            line.copy(
+                                text = edited[i],
+                                words = emptyList(),
+                                translation = emptyList(),
+                                transliteration = null,
+                            )
+                        }
+                    }
+                original.copy(lines = lines).toLrc()
+            } else {
+                text
+            }
+        val parsed = LyricsParser.parse(lrc)
+        val standard = parsed?.toStandardLrc() ?: lrc
+        val rich = if (isTtml) "DMT-TTML:$lrc" else "DMT-LRC:$lrc"
+        val ttml = if (isTtml) lrc else null
+        c.stop()
+        viewModelScope.launch {
+            delay(500)
+            LyricsEmbedder.embed(context, track, standard, rich, ttml).fold(
+                onSuccess = {
+                    getLyrics.invalidateLocal(track.path)
+                    notify(UiText(R.string.notice_lyrics_embedded))
+                    scan(refresh = true)
+                    lyrics.load(c.currentMediaItem)
+                },
+                onFailure = {
+                    reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
                     scan(refresh = true)
                 },
             )

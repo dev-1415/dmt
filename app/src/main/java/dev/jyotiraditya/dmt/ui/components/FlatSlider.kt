@@ -20,7 +20,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.ui.theme.Ink
-import dev.jyotiraditya.dmt.ui.theme.LocalAccent
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Muted
 import dev.jyotiraditya.dmt.ui.theme.Surface2
 
@@ -38,7 +38,7 @@ fun FlatSlider(
     modifier: Modifier = Modifier,
     marks: List<Pair<Float, String>> = emptyList(),
 ) {
-    val accent = LocalAccent.current
+    val accent = LocalCoverColors.current
     Column(modifier = modifier.fillMaxWidth()) {
         Slider(
             value = value,
@@ -50,7 +50,7 @@ fun FlatSlider(
                 Canvas(modifier = Modifier.fillMaxWidth().height(Bar)) {
                     drawRect(Surface2)
                     drawRect(
-                        accent.fill,
+                        accent.primary,
                         size = Size(size.width * slider.coercedValueAsFraction, size.height),
                     )
                 }

@@ -24,6 +24,7 @@ import dev.jyotiraditya.dmt.data.source.local.KEY_LIBRARY_GENERATION
 import dev.jyotiraditya.dmt.data.source.local.KEY_LIBRARY_SORT
 import dev.jyotiraditya.dmt.data.source.local.KEY_LIBRARY_TAB_ORDER
 import dev.jyotiraditya.dmt.data.source.local.KEY_LYRICS_SOURCE
+import dev.jyotiraditya.dmt.data.source.local.KEY_LYRICS_OFFSET
 import dev.jyotiraditya.dmt.data.source.local.KEY_NORMALIZE
 import dev.jyotiraditya.dmt.data.source.local.KEY_ROMANIZED_LYRICS
 import dev.jyotiraditya.dmt.data.source.local.KEY_SETUP_DONE
@@ -168,6 +169,7 @@ private fun Preferences.toSettings(): DmtSettings = DmtSettings(
     normalizeVolume = this[KEY_NORMALIZE] ?: false,
     romanizedLyrics = this[KEY_ROMANIZED_LYRICS] ?: false,
     singerColors = this[KEY_SINGER_COLORS] ?: true,
+    lyricsOffsetMs = this[KEY_LYRICS_OFFSET] ?: 0,
     animatedArt = this[KEY_ANIMATED_ART] ?: false,
     // Online sources are picked per track and never saved.
     lyricsSource =
@@ -204,6 +206,7 @@ private fun MutablePreferences.write(settings: DmtSettings) {
     this[KEY_NORMALIZE] = settings.normalizeVolume
     this[KEY_ROMANIZED_LYRICS] = settings.romanizedLyrics
     this[KEY_SINGER_COLORS] = settings.singerColors
+    this[KEY_LYRICS_OFFSET] = settings.lyricsOffsetMs
     this[KEY_ANIMATED_ART] = settings.animatedArt
     this[KEY_LYRICS_SOURCE] = settings.lyricsSource.name
     this[KEY_STOP_ON_DISMISS] = settings.stopOnDismiss

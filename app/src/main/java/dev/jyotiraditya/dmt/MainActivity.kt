@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
             val player by playerViewModel.player.collectAsStateWithLifecycle()
             val cover = rememberFieldColor(state.cover.bitmap, state.nowPlayingSeed)
             val coverColors = rememberCoverColors(state.cover.bitmap, state.nowPlayingSeed)
-            DMTTheme(accent = accentFor(state.settings.accent, cover)) {
+            DMTTheme(accent = accentFor(state.settings.accent)) {
                 CompositionLocalProvider(LocalCoverColors provides coverColors) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),

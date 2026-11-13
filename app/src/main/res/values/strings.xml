@@ -223,6 +223,18 @@
     <string name="lyrics_embed">Embed lyrics in file</string>
     <string name="notice_lyrics_embedded">Lyrics embedded in the file</string>
     <string name="error_lyrics_embed">Couldn’t embed lyrics in the file</string>
+    <string name="lyrics_offset_title">Lyric offset</string>
+    <string name="lyrics_offset_hint">Shift the lyrics against the audio</string>
+    <string name="lyrics_edit_title">Edit lyrics &amp; timing</string>
+    <string name="lyrics_edit_hint">Shift the timing, or edit the words</string>
+    <string name="lyrics_offset_tab">Offset</string>
+    <string name="lyrics_edit_tab">Edit</string>
+    <string name="lyrics_timing_tab">Timing</string>
+    <string name="lyrics_offset_earlier">Earlier</string>
+    <string name="lyrics_offset_later">Later</string>
+    <string name="lyrics_offset_reset">Reset</string>
+    <string name="lyrics_offset_apply">Apply to lyrics</string>
+    <string name="lyrics_edit_save">Save lyrics</string>
 
     <!-- Track fields -->
     <string name="track_field_title">Title</string>
@@ -310,8 +322,6 @@
     <string name="accent_mono">Black and white</string>
     <string name="accent_wallpaper">Wallpaper</string>
     <string name="accent_wallpaper_hint">Matches your device’s colours</string>
-    <string name="accent_cover">Album cover</string>
-    <string name="accent_cover_hint">Changes with the song playing</string>
 
     <!-- Library folders -->
     <string name="folders_title">Library folders</string>

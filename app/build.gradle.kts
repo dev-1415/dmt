@@ -110,7 +110,6 @@ dependencies {
     implementation(libs.bundles.coil)
     implementation(project(":lyrics"))
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.palette)
     implementation(libs.material)
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.androidx.datastore.preferences)

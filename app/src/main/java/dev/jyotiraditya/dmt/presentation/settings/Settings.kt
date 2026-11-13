@@ -157,7 +157,6 @@ private fun SettingsHome(state: DmtState, cover: Color, dispatch: (DmtAction) ->
     if (pickingAccent) {
         AccentSheet(
             current = settings.accent,
-            cover = cover,
             onPick = { save(settings.copy(accent = it)) },
             onDismiss = { pickingAccent = false },
         )

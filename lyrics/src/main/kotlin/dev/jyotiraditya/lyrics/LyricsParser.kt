@@ -9,16 +9,18 @@ object LyricsParser {
     fun parse(raw: String): Lyrics? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
-        return when (LyricsFormat.of(trimmed)) {
-            LyricsFormat.TTML -> TtmlParser.parse(trimmed)
+        val parsed =
+            when (LyricsFormat.of(trimmed)) {
+                LyricsFormat.TTML -> TtmlParser.parse(trimmed)
 
-            LyricsFormat.ENRICHED_LRC,
-            LyricsFormat.WORD_LRC,
-            LyricsFormat.LINE_LRC,
-            -> LrcParser.parse(trimmed)
+                LyricsFormat.ENRICHED_LRC,
+                LyricsFormat.WORD_LRC,
+                LyricsFormat.LINE_LRC,
+                -> LrcParser.parse(trimmed)
 
-            LyricsFormat.PLAIN -> parsePlain(trimmed)
-        }
+                LyricsFormat.PLAIN -> parsePlain(trimmed)
+            }
+        return parsed?.copy(raw = trimmed)
     }
 
     private fun parsePlain(text: String): Lyrics = Lyrics(

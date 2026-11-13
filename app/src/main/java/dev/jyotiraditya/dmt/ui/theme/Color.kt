@@ -1,9 +1,6 @@
 package dev.jyotiraditya.dmt.ui.theme
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
 
 // A dark-only palette; surfaces are told apart by tone, never by borders or shadows.
 
@@ -33,34 +30,6 @@ val Night = Color(0xFF000000)
 
 val NightInk = Color(0xFFF2F2F2)
 
-/** A dark neutral the cover tint is blended into, so no cover turns the UI olive or neon. */
-private val TintBase = Color(0xFF0E1114)
-
-/** This colour at a dark, muted tint that keeps light text readable. */
-fun Color.tintedDark(lightness: Float): Color {
-    val hsl = FloatArray(3)
-    ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[1] = (hsl[1] * 0.72f).coerceIn(0f, 1f)
-    // Warm hues read as olive when they are too dark, so lift them. Yellow needs the most:
-    // a dark yellow is olive, while a dark gold still reads as the cover's colour.
-    val lift =
-        when {
-            hsl[0] in 15f..<45f -> 0.14f
-            hsl[0] in 45f..75f -> 0.20f
-            hsl[0] in 100f..160f -> 0.08f
-            else -> 0f
-        }
-    val cap = if (hsl[0] in 45f..75f) 0.38f else 0.30f
-    hsl[2] = (lightness + lift).coerceAtMost(cap)
-    return lerp(TintBase, Color(ColorUtils.HSLToColor(hsl)), 0.78f)
-}
-
-/** The player background: a deep, rich tint of the cover colour. */
-fun Color.darkenedForPlayer(): Color = tintedDark(0.12f)
-
-/** The lighter top of the player gradient. */
-fun Color.darkenedForPlayerTop(): Color = tintedDark(0.20f)
-
 val Danger = Color(0xFFFF8A80)
 
 /** The fill of the row at this position in a list, alternating [Surface] and [Surface2]. */
@@ -70,9 +39,3 @@ val Int.rowFill: Color
 /** The text colour with the most contrast against this background. */
 fun Color.inkOn(): Color =
     if ((red * 0.2126f + green * 0.7152f + blue * 0.0722f) > 0.42f) Dark else Ink
-
-/** This colour blended toward white by [amount]. */
-fun Color.lighten(amount: Float): Color = lerp(this, Color.White, amount)
-
-/** This colour blended toward black by [amount]. */
-fun Color.darken(amount: Float): Color = lerp(this, Color.Black, amount)

@@ -73,7 +73,7 @@ internal fun LyricsPanel(
                         rememberPlaybackPosition(
                             player,
                             moving = rememberIsPlaying(player) && lyrics.synced && active,
-                            leadMs = LEAD_MS,
+                            leadMs = LEAD_MS + state.settings.lyricsOffsetMs,
                         ),
                     durationMs = state.durationMs,
                     romanized = state.settings.romanizedLyrics,
@@ -140,7 +140,7 @@ internal fun CurrentLyricLine(
                 rememberPlaybackPosition(
                     player,
                     moving = rememberIsPlaying(player) && lyrics.synced && active,
-                    leadMs = LEAD_MS,
+                    leadMs = LEAD_MS + state.settings.lyricsOffsetMs,
                 )
             // Read the position through a derived state so a new frame only redraws the sweep
             // instead of recomposing this line.

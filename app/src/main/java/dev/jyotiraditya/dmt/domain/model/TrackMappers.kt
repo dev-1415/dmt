@@ -10,6 +10,26 @@ val Track.primaryArtist: String
 
 fun String.asCredit(): String = replace(COLLAB_SEPARATORS, " + ")
 
+/** A bracketed version or guest note in a title, such as `(feat. X)` or `[Live]`. */
+private val TITLE_DECORATION = Regex("""\s*[(\[][^)\]]*[)\]]""")
+
+/**
+ * The separators between collaborators in an artist tag. `+` is what the app writes for `;` and
+ * `/`, and the rest are common in files tagged elsewhere.
+ */
+private val ARTIST_SEPARATORS =
+    Regex("""\s*(?:[+&,;/]|\b(?:feat\.?|ft\.?|featuring|with|×)\b)\s*""", RegexOption.IGNORE_CASE)
+
+/** The first artist in a collaboration, for searching a catalogue that indexes one artist. */
+val Track.searchArtist: String
+    get() =
+        primaryArtist.split(ARTIST_SEPARATORS).firstOrNull { it.isNotBlank() }?.trim()
+            ?: primaryArtist
+
+/** The title without a guest credit or a bracketed version note. */
+val Track.searchTitle: String
+    get() = title.replace(FEATURING, "").replace(TITLE_DECORATION, "").trim().ifBlank { title }
+
 private val DISC_FOLDER = Regex("""/(cd|disc|disk)\s*\d+$""", RegexOption.IGNORE_CASE)
 
 /** Letters and digits only, so apostrophes, spacing and punctuation don't split one album. */
