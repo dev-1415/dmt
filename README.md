@@ -27,44 +27,34 @@
   </tr>
 </table>
 
-## Features
-
-- **Your library, your way.** Tracks, albums, artists, playlists, genres and folders, with one
-  search across all of them and a sort of your own in every folder. Cue sheets split a single-file
-  rip into real tracks.
-- **Plays almost anything.** Bundled FFmpeg decoders, including Dolby AC-4, for formats Android
-  cannot decode on its own.
-- **Lyrics that follow the song.** Word-by-word synced lyrics from TTML and LRC in any script,
-  with backing vocals, a colour for each singer and romanization. They come from the track's
-  tags, a lyrics file next to it or your server, and from LRCLIB or lrc.red when you ask. Anything
-  you fetch can be written back into the file's tags.
-- **See the whole signal chain.** Format, decoder, speed, output and device, from file to
-  speaker, with lossless, hi-res and Dolby badges worked out from the file itself.
-- **A player that stays out of the way.** Sleep timer, playback speed, hold to seek, a queue you
-  can reorder, and your last session restored on launch.
-- **Everywhere you listen.** Media notification, system equalizer, volume levelling from
-  ReplayGain and R128 tags, and Android Auto with voice search.
-- **Flat and dark.** Every record is shown in its own colour, and the player takes the colour of
-  the cover.
-
 ## What's new in this fork
 
 These are the changes this fork adds on top of dmt 2.0.
 
-- **Sort any folder.** Each folder has its own sort control: title, artist, album, track number,
-  date added, date modified, duration or file name, ascending or descending. The choice is
-  remembered across sessions.
-- **Shape your library.** Pick which sections appear as top-level tabs — Folders, Tracks, Albums,
-  Artists, Playlists and Genres — and choose the folder the Folders tab opens at, with the tree
-  shown indented so deep folders are easy to find.
-- **Search and sort the queue.** Filter the queue as you type, sort it by title, artist, album,
-  date added or date modified, and keep drag-to-reorder for queue order. Searching or sorting
-  falls back to queue order when shuffle is on.
-- **Lyrics, in place.** Lyrics open in the cover's square on the Now Playing screen instead of a
-  separate page, fading in over the artwork. Fetched lyrics can be embedded into the playing
-  track's tags, so they stay with the file on every device and every player.
-- **A tidier player.** The queue has a refreshed, more compact layout with a draggable scroll bar,
-  cleaner separators, and an empty state when nothing is playing.
+- **Better folder navigation.** Long-press the Folders tab to jump to the playing track's folder
+  and scroll to it, start the tab at a folder of your choice, browse an indented tree, and give
+  every folder its own sort: title, artist, album, track number, date added, date modified,
+  duration or file name, ascending or descending, remembered across sessions.
+- **Library tabs in your order.** Pick which sections appear as tabs and move them up and down in
+  settings; the bottom bar follows that order. Folder and playlist cards carry a collage of their
+  albums, and a playlist spanning several albums gets a mosaic.
+- **Lyrics you can edit and keep.** Shift the lyrics against the audio, edit the words, or open
+  the raw timing, then write the result into the file. Plain LRC goes in the lyrics tag for any
+  player, and the word-timed copy goes in a standard TTML sidecar, so word timing, translations
+  and backing vocals survive; a shifted lyric is written back with its timing intact.
+- **Better app navigation.** A bottom bar with icon tabs and a sliding mark, a back link above the
+  page, a second tap on Folders or Playlists returning to the top of that section, and a queue that
+  scrolls to the track that is playing.
+- **Material You from the cover.** A full dark Material scheme is generated from the cover and
+  shared by the page, transport, seek bar, live lyric, selection marks, search box and sheets, so
+  the colours of the record carry through the whole screen.
+- **Audio that wastes less.** MP3 plays through gapless offload with the buffer sized from the
+  bitrate, the power-saving AudioTrack path is used for every track, and Opus and Vorbis are handed
+  to the bundled FFmpeg decoders instead of the platform's expensive software decoders.
+- **A queue and playlists you can shape.** Drag the queue to reorder it, filter it as you type, and
+  sort it by title, artist, album, date added or date modified; "play next" moves an existing copy
+  instead of adding a duplicate. Import and export M3U/M3U8, reorder a playlist's tracks, and save
+  the queue as a new playlist from its header.
 
 ## Sources
 
