@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -28,8 +29,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.state.rememberPlayPauseButtonState
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.LyricsSource
-import dev.jyotiraditya.dmt.presentation.nowplaying.rememberIsPlaying
-import dev.jyotiraditya.dmt.presentation.nowplaying.rememberPlaybackPosition
+import dev.jyotiraditya.dmt.presentation.nowplaying.SeekHold
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.ui.components.EmptyState
@@ -37,10 +37,18 @@ import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.LyricType
 import dev.jyotiraditya.dmt.ui.theme.NightInk
+import dev.jyotiraditya.lyrics.Voice
 import dev.jyotiraditya.lyrics.mainVocalOnly
 
 /** How far ahead of the reported position words are lit, to cover display latency. */
 private const val LEAD_MS = 80L
+
+/** The lyric clock: the player's position, or the seek bar's while it is dragged. */
+@Composable
+internal fun rememberLyricPosition(hold: SeekHold, offsetMs: Int): State<Long> =
+    remember(hold, offsetMs) {
+        derivedStateOf { hold.shownMs() + LEAD_MS + offsetMs }
+    }
 
 /** The lyrics in the cover's square, drawn over the player tint. */
 @OptIn(UnstableApi::class)
@@ -48,9 +56,9 @@ private const val LEAD_MS = 80L
 internal fun LyricsPanel(
     state: DmtState,
     player: Player,
+    hold: SeekHold,
     dispatch: (DmtAction) -> Unit,
     background: Color,
-    active: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val lyrics = state.lyrics
@@ -69,12 +77,7 @@ internal fun LyricsPanel(
                 LyricsView(
                     lyrics = lyrics,
                     trackId = state.nowPlayingId,
-                    position =
-                        rememberPlaybackPosition(
-                            player,
-                            moving = rememberIsPlaying(player) && lyrics.synced && active,
-                            leadMs = LEAD_MS + state.settings.lyricsOffsetMs,
-                        ),
+                    position = rememberLyricPosition(hold, state.settings.lyricsOffsetMs),
                     durationMs = state.durationMs,
                     romanized = state.settings.romanizedLyrics,
                     colors = colors,
@@ -109,9 +112,8 @@ internal fun LyricsPanel(
 @Composable
 internal fun CurrentLyricLine(
     state: DmtState,
-    player: Player,
+    position: State<Long>,
     background: Color,
-    active: Boolean,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
@@ -136,12 +138,6 @@ internal fun CurrentLyricLine(
             val colors = remember(bySinger, background, primary) {
                 LyricColors.on(ink = NightInk, background = background, bySinger, lead = primary)
             }
-            val position =
-                rememberPlaybackPosition(
-                    player,
-                    moving = rememberIsPlaying(player) && lyrics.synced && active,
-                    leadMs = LEAD_MS + state.settings.lyricsOffsetMs,
-                )
             // Read the position through a derived state so a new frame only redraws the sweep
             // instead of recomposing this line.
             val lineIndex by
@@ -163,7 +159,12 @@ internal fun CurrentLyricLine(
                     LyricType.copy(
                         fontSize = 20.sp,
                         lineHeight = 24.sp,
-                        textAlign = TextAlign.Start,
+                        textAlign =
+                            when (main.voice) {
+                                Voice.GROUP -> TextAlign.Center
+                                Voice.SECONDARY -> TextAlign.End
+                                else -> TextAlign.Start
+                            },
                     )
                 if (lyrics.synced && main.words.isNotEmpty()) {
                     SweepText(

@@ -24,28 +24,13 @@ import org.jaudiotagger.audio.ogg.OggFileWriter
 import org.jaudiotagger.audio.opus.OpusFileWriter
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.Tag
-import org.w3c.dom.Element
-import org.xml.sax.InputSource
+
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
-import java.io.StringReader
-import java.io.StringWriter
-import java.util.Locale
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.transform.OutputKeys
-import javax.xml.transform.TransformerFactory
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
 import kotlin.coroutines.resume
 
 private const val TAG = "LyricsEmbedder"
-
-/** Marks a TTML sidecar an older version of this app wrote, so only ours is removed. */
-private const val TTML_MARKER = "<!-- DMT-TTML -->"
-
-/** The TTML timing attributes whose values need normalizing for other players. */
-private val TTML_TIME_ATTRIBUTE = Regex("""(begin|end|dur)="([^"]+)"""")
 
 private val DIV_BEGIN = Regex("""<div[^>]*\bbegin="([^"]+)"""")
 
@@ -156,92 +141,11 @@ object LyricsEmbedder {
             }
         }
 
-    /** Writes standard TTML beside the track, normalized for TTML-aware players. */
-    private fun writeTtmlSidecar(file: File, ttml: String) {
-        val prepared = relativizeTtmlTimes(normalizeTtmlTimes(ttml))
-        File(file.parentFile, "${file.nameWithoutExtension}.ttml").writeText(prepared)
-    }
-
-    /** These TTML times moved by [offsetMs], for applying a lyric offset to the sidecar. */
-    fun shiftTtmlTimes(ttml: String, offsetMs: Long): String =
-        runCatching {
-            val factory = DocumentBuilderFactory.newInstance()
-            factory.isNamespaceAware = true
-            val document = factory.newDocumentBuilder().parse(InputSource(StringReader(ttml)))
-            shiftElement(document.documentElement, offsetMs)
-            val transformer = TransformerFactory.newInstance().newTransformer()
-            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no")
-            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8")
-            val writer = StringWriter()
-            transformer.transform(DOMSource(document), StreamResult(writer))
-            writer.toString()
-        }.getOrDefault(ttml)
-
-    private fun shiftElement(element: Element, offsetMs: Long) {
-        for (attribute in listOf("begin", "end")) {
-            val ms = parseTtmlTime(element.getAttribute(attribute)) ?: continue
-            element.setAttribute(attribute, formatTtmlTimeMs((ms + offsetMs).coerceAtLeast(0)))
-        }
-        val children = element.childNodes
-        for (i in 0 until children.length) {
-            val child = children.item(i)
-            if (child is Element) shiftElement(child, offsetMs)
-        }
-    }
-
-    /** Whether [ttml] uses times relative to its parents (our sidecar) rather than absolute times. */
+    /** Whether [ttml] uses times relative to its parents rather than absolute times. */
     fun isRelativeTtml(ttml: String): Boolean {
         val div = DIV_BEGIN.find(ttml)?.groupValues?.get(1)?.let(::parseTtmlTime) ?: return false
         val p = P_BEGIN.find(ttml)?.groupValues?.get(1)?.let(::parseTtmlTime) ?: return false
         return p < div
-    }
-
-    /** lrc.red writes `mm:ss.SSS` and bare seconds; TTML players expect `hh:mm:ss.SSS`. */
-    private fun normalizeTtmlTimes(ttml: String): String =
-        TTML_TIME_ATTRIBUTE.replace(ttml) { match ->
-            val attribute = match.groupValues[1]
-            val value = match.groupValues[2]
-            "$attribute=\"${normalizeTtmlTime(value)}\""
-        }
-
-    private fun normalizeTtmlTime(value: String): String {
-        val ms = parseTtmlTime(value) ?: return value
-        return formatTtmlTimeMs(ms)
-    }
-
-    /**
-     * lrc.red writes absolute times on every level, while TTML players add the parent's time.
-     * Make each child's time relative to its parent so the player's addition lands correctly.
-     */
-    private fun relativizeTtmlTimes(ttml: String): String =
-        runCatching {
-            val factory = DocumentBuilderFactory.newInstance()
-            factory.isNamespaceAware = true
-            val document = factory.newDocumentBuilder().parse(InputSource(StringReader(ttml)))
-            relativizeElement(document.documentElement, 0L)
-            val transformer = TransformerFactory.newInstance().newTransformer()
-            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no")
-            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8")
-            val writer = StringWriter()
-            transformer.transform(DOMSource(document), StreamResult(writer))
-            writer.toString()
-        }.getOrDefault(ttml)
-
-    private fun relativizeElement(element: Element, parentBeginMs: Long) {
-        val beginMs = parseTtmlTime(element.getAttribute("begin"))
-        val endMs = parseTtmlTime(element.getAttribute("end"))
-        if (beginMs != null) {
-            element.setAttribute("begin", formatTtmlTimeMs((beginMs - parentBeginMs).coerceAtLeast(0)))
-        }
-        if (endMs != null) {
-            element.setAttribute("end", formatTtmlTimeMs((endMs - parentBeginMs).coerceAtLeast(0)))
-        }
-        val childParentMs = beginMs ?: parentBeginMs
-        val children = element.childNodes
-        for (i in 0 until children.length) {
-            val child = children.item(i)
-            if (child is Element) relativizeElement(child, childParentMs)
-        }
     }
 
     private fun parseTtmlTime(value: String): Long? {
@@ -270,21 +174,10 @@ object LyricsEmbedder {
         }
     }
 
-    private fun formatTtmlTimeMs(ms: Long): String {
-        val totalSeconds = ms / 1000
-        val hours = totalSeconds / 3600
-        val minutes = (totalSeconds % 3600) / 60
-        val seconds = totalSeconds % 60
-        val millis = ms % 1000
-        return String.format(Locale.ROOT, "%02d:%02d:%02d.%03d", hours, minutes, seconds, millis)
-    }
-
-    /** Removes the track's TTML sidecar only when an older version of this app wrote it. */
+    /** Removes the track's TTML sidecar now that the lyrics live in the file itself. */
     private fun deleteTtmlSidecar(file: File) {
         val sidecar = File(file.parentFile, "${file.nameWithoutExtension}.ttml")
-        if (!sidecar.isFile) return
-        val ours = runCatching { sidecar.readText().contains(TTML_MARKER) }.getOrDefault(false)
-        if (ours) sidecar.delete()
+        if (sidecar.isFile) sidecar.delete()
     }
 
     /** Reads [source], writes the lyrics, and returns the tag that was written. */

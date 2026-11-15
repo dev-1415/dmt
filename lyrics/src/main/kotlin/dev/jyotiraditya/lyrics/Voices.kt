@@ -7,8 +7,18 @@ internal fun List<LyricLine>.mergeSimultaneousDuplicates(): List<LyricLine> {
     val result = ArrayList<LyricLine>(size)
     for (line in this) {
         val last = result.lastOrNull()
+        // A background or transliteration line can repeat the main line's text; merging it
+        // would turn the main line into a group line and drop the secondary line.
+        val lineIsBackground = line.words.isNotEmpty() && line.words.all { it.background }
+        val lastIsBackground =
+            last != null && last.words.isNotEmpty() && last.words.all { it.background }
         val duplicate =
-            last != null && !last.interlude && last.text == line.text && line.startMs < last.endMs
+            last != null &&
+                !last.interlude &&
+                last.text == line.text &&
+                line.startMs < last.endMs &&
+                !lineIsBackground &&
+                !lastIsBackground
         if (!duplicate) {
             result += line
             continue

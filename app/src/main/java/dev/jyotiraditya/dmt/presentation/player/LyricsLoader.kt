@@ -24,14 +24,25 @@ internal class LyricsLoader(
     /** Reads the lyrics of [mediaItem] from the saved source; [force] re-reads the same track. */
     fun load(mediaItem: MediaItem?, force: Boolean = false) {
         val forId = mediaItem?.mediaId
-        val known = store.current.library.track(forId) != null
+        load(forId, store.current.library.track(forId), force)
+    }
+
+    /**
+     * Reads [track]'s lyrics directly, so a file whose tags were just rewritten is shown at once
+     * instead of waiting for the library scan to finish.
+     */
+    fun load(track: Track, force: Boolean = false) {
+        load(track.id.toString(), track, force)
+    }
+
+    private fun load(forId: String?, track: Track?, force: Boolean) {
+        val known = track != null
         // A track transition clears the lyrics; never skip a reload that would leave them empty.
         if (!force && known && forId == loadedFor && store.current.lyrics != null) return
         if (known) loadedFor = forId
         store.reduce { it.copy(lyricsFetching = true) }
         job?.cancel()
         job = scope.launch {
-            val track = store.current.library.track(forId)
             val preferred = savedSource()
             val result = Result.success(track?.let { getLyrics(it, preferred) })
             // The source sheet reads the other sources when it opens, so a track change only

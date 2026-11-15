@@ -511,9 +511,10 @@ constructor(
         filterJob?.cancel()
         val filtered = filterLibrary(library, currentState.query)
         val playing = controller?.currentMediaItem
-        val wasKnown = currentState.nowPlayingTrack != null
         reduce { it.withLibrary(library).withFiltered(filtered).withHome() }
-        if (!wasKnown && currentState.nowPlayingTrack != null) {
+        // The library may arrive after the player restored its session, so the first lyrics
+        // read can have missed the track. Ask again now that the track is known.
+        if (currentState.nowPlayingTrack != null) {
             loadNowPlaying(playing)
             details.loadTech(playing, controller?.currentTracks?.playedAudioFormat())
         }
@@ -604,10 +605,13 @@ constructor(
         if (!foreground) return
         val id = mediaItem?.mediaId
         val known = currentState.nowPlayingTrack != null
-        // Returning to the same track must not re-read its cover, format and lyrics.
-        if (known && id == detailsFor) return
-        if (known) detailsFor = id
-        details.load(mediaItem)
+        // Returning to the same track must not re-read its cover and format.
+        if (!known || id != detailsFor) {
+            if (known) detailsFor = id
+            details.load(mediaItem)
+        }
+        // The lyrics may have failed to load or been cleared, and their loader skips a track
+        // that already has them, so asking again is cheap.
         lyrics.load(mediaItem)
         controller?.let { c ->
             viewModelScope.launch { sleepAndSpeed.applyForTrack(c, id) }
@@ -655,7 +659,7 @@ constructor(
                     // Re-read the file's tags so the library shows the same title and artist.
                     scan(refresh = true)
                     // Show the newly embedded lyrics at once, not the old ones.
-                    lyrics.load(c.currentMediaItem, force = true)
+                    lyrics.load(track, force = true)
                 },
                 onFailure = {
                     reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
@@ -709,7 +713,7 @@ constructor(
                     getLyrics.invalidateLocal(track.path)
                     notify(UiText(R.string.notice_lyrics_embedded))
                     scan(refresh = true)
-                    lyrics.load(c.currentMediaItem, force = true)
+                    lyrics.load(track, force = true)
                 },
                 onFailure = {
                     reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
@@ -739,7 +743,7 @@ constructor(
                     getLyrics.invalidateLocal(track.path)
                     notify(UiText(R.string.notice_lyrics_embedded))
                     scan(refresh = true)
-                    lyrics.load(c.currentMediaItem, force = true)
+                    lyrics.load(track, force = true)
                 },
                 onFailure = {
                     reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }

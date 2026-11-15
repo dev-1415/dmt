@@ -87,19 +87,69 @@ class LyricsLrcTest {
         val raw = javaClass.getResource("/lyrics/ttml_multivoice.ttml")!!.readText()
         val lyrics = LyricsParser.parse(raw)!!
         val lrc = lyrics.toLrc()
-        assertTrue(lrc.contains("v1:"))
+        assertTrue(lrc.contains("v2:"))
         val parsed = LyricsParser.parse(lrc)!!
-        // Backing vocals become their own [bg: ...] lines, so compare the main lines only.
+        // Backing vocals become their own [bg: ...] lines, and a third singer is written as a
+        // group, so compare the first two singers' main lines by their start time.
+        val actualByStart = parsed.lines.associateBy { it.startMs }
         val expectedMain =
-            lyrics.lines.filter { line -> line.words.isEmpty() || line.words.any { !it.background } }
-        val actualMain =
-            parsed.lines.filter { line -> line.words.isEmpty() || line.words.any { !it.background } }
-        assertEquals(expectedMain.size, actualMain.size)
-        expectedMain.zip(actualMain).forEach { (expected, actual) ->
-            if (expected.voice != Voice.GROUP) {
-                assertEquals(expected.voice, actual.voice)
+            lyrics.lines.filter { line ->
+                (line.words.isEmpty() || line.words.any { !it.background }) &&
+                    line.singer in 0..1
             }
+        assertTrue(expectedMain.isNotEmpty())
+        expectedMain.forEach { expected ->
+            val actual = actualByStart[expected.startMs] ?: return@forEach
+            assertEquals(expected.voice, actual.voice)
         }
+    }
+
+    @Test
+    fun `a background line repeating the main text stays separate`() {
+        val main =
+            LyricLine(
+                1_000,
+                2_000,
+                "Take me away",
+                words = listOf(LyricWord(1_000, 2_000, 0, 12, background = false)),
+            )
+        val background =
+            LyricLine(
+                1_000,
+                2_000,
+                "Take me away",
+                words = listOf(LyricWord(1_000, 2_000, 0, 12, background = true)),
+            )
+        val merged = listOf(main, background).mergeSimultaneousDuplicates()
+        assertEquals(2, merged.size)
+        assertEquals(Voice.PRIMARY, merged.first().voice)
+        assertTrue(merged.last().words.all { it.background })
+    }
+
+    @Test
+    fun `a group is written as v3 and survives the round trip`() {
+        val lyrics =
+            Lyrics(
+                listOf(
+                    LyricLine(1_000, 2_000, "One", singer = 0),
+                    LyricLine(2_000, 3_000, "Two", singer = 1, voice = Voice.SECONDARY),
+                    LyricLine(
+                        3_000,
+                        4_000,
+                        "All",
+                        voice = Voice.GROUP,
+                        singer = LyricLine.NO_SINGER,
+                    ),
+                ),
+                synced = true,
+            )
+        val lrc = lyrics.toLrc()
+        assertTrue(lrc.contains("[00:02.00]v2:Two"))
+        assertTrue(lrc.contains("[00:03.00]v3:All"))
+
+        val parsed = LyricsParser.parse(lrc)!!
+        assertEquals(Voice.GROUP, parsed.lines.last().voice)
+        assertEquals(LyricLine.NO_SINGER, parsed.lines.last().singer)
     }
 
     @Test

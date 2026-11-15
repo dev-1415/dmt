@@ -255,6 +255,7 @@
     <string name="lyrics_timing_edit_word">Edit word text</string>
     <string name="lyrics_timing_play_line">Play from this line</string>
     <string name="lyrics_timing_play_word">Play from this word</string>
+    <string name="lyrics_timing_add_word">Add word</string>
     <string name="lyrics_timing_done">Done</string>
     <string name="lyrics_timing_cancel">Cancel</string>
 

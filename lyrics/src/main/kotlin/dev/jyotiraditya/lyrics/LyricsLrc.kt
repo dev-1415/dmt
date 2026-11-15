@@ -19,10 +19,7 @@ fun Lyrics.toLrc(): String {
     }
 }
 
-/**
- * This lyrics as plain line-level LRC that any player can read. The rich version, with word
- * timing, translations and backing vocals, goes in the standard TTML sidecar instead.
- */
+/** This lyrics as plain line-level LRC that any player can read. */
 fun Lyrics.toStandardLrc(): String {
     if (!synced) return lines.joinToString("\n") { it.text }
     return lines.joinToString("\n") { line -> "[${line.startMs.lrcTime()}]${line.text}" }
@@ -30,8 +27,15 @@ fun Lyrics.toStandardLrc(): String {
 
 private fun LyricLine.lrcLine(): String {
     val stamp = "[${startMs.lrcTime()}]"
-    // A secondary line keeps its side after the round trip; primary is the default.
-    val voice = if (this.voice == Voice.SECONDARY) "v1:" else ""
+    // iTunes' dual-speaker extension: the first singer is unprefixed, the second is `v2:`,
+    // and a third singer or a group is `v3:`. Gramophone reads `v3:` as a centered group.
+    val voice = when {
+        interlude -> ""
+        this.voice == Voice.GROUP -> "v3:"
+        this.voice == Voice.SECONDARY -> "v2:"
+        singer >= 2 -> "v3:"
+        else -> ""
+    }
     val primary = words.filterNot { it.background }
     if (words.isEmpty()) return stamp + voice + text
     if (primary.isEmpty()) return ""

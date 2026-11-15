@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Constraints
 import dev.jyotiraditya.dmt.R
@@ -30,7 +32,11 @@ import dev.jyotiraditya.dmt.domain.model.Cover
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.repository.ArtworkRepository
 import dev.jyotiraditya.dmt.ui.theme.CoverColors
+import dev.jyotiraditya.dmt.ui.theme.Ground
+import dev.jyotiraditya.dmt.ui.theme.Muted
+import dev.jyotiraditya.dmt.ui.theme.Surface
 import dev.jyotiraditya.dmt.ui.theme.Surface2
+import dev.jyotiraditya.dmt.ui.theme.wallpaperAccentAvailable
 import dev.jyotiraditya.dmt.util.contentColors
 import dev.jyotiraditya.dmt.util.contentFieldColor
 
@@ -92,12 +98,37 @@ fun rememberFieldColor(bitmap: Bitmap?, seed: Long): Color {
     return field
 }
 
-/** The full Material You scheme for a decoded [bitmap], or [CoverColors.Fallback]. */
+/** The wallpaper's Material You scheme, or the fixed fallback before Android 12. */
+@Composable
+fun rememberSystemCoverColors(): CoverColors {
+    if (!wallpaperAccentAvailable) return CoverColors.Fallback
+    val context = LocalContext.current
+    return remember(context) {
+        val scheme = dynamicDarkColorScheme(context)
+        CoverColors(
+            surface = Ground,
+            surfaceContainer = Surface,
+            onSurfaceVariant = Muted,
+            primary = scheme.primary,
+            onPrimary = scheme.onPrimary,
+            primaryContainer = scheme.primaryContainer,
+            onPrimaryContainer = scheme.onPrimaryContainer,
+            secondary = scheme.secondary,
+            onSecondary = scheme.onSecondary,
+        )
+    }
+}
+
+/**
+ * The full Material You scheme for a decoded [bitmap]. A track with no cover takes the
+ * wallpaper's accent instead of the fixed fallback.
+ */
 @Composable
 fun rememberCoverColors(bitmap: Bitmap?, seed: Long): CoverColors {
+    val system = rememberSystemCoverColors()
     val colors by
-        produceState(CoverColors.Fallback, bitmap, seed) {
-            value = bitmap?.contentColors() ?: CoverColors.Fallback
+        produceState(system, bitmap, seed, system) {
+            value = bitmap?.contentColors() ?: system
         }
     return colors
 }

@@ -3,6 +3,7 @@ package dev.jyotiraditya.lyrics.lrc
 import dev.jyotiraditya.lyrics.LyricLine
 import dev.jyotiraditya.lyrics.Lyrics
 import dev.jyotiraditya.lyrics.TimedText
+import dev.jyotiraditya.lyrics.Voice
 import dev.jyotiraditya.lyrics.assignSides
 import dev.jyotiraditya.lyrics.fillLineEnds
 import dev.jyotiraditya.lyrics.isReadingOf
@@ -68,9 +69,6 @@ private fun String.isUnprefixedVoiceLine(): Boolean {
 private class LrcLineReader(private val hasUnprefixedVoice: Boolean) {
     val lines = mutableListOf<LyricLine>()
 
-    /** Singer index by voice number, in the order the voices first appear. */
-    private val singers = HashMap<Int, Int>()
-
     fun read(source: String) {
         val trimmed = source.trim()
         val background = BACKGROUND_LINE.matchEntire(trimmed)
@@ -90,17 +88,22 @@ private class LrcLineReader(private val hasUnprefixedVoice: Boolean) {
         val rest = source.substring(stamps.last().end)
         if (rest.containsTimeTag(TagStyle.SQUARE)) stamps = stamps.take(1)
 
-        val (body, voice) = source.substring(stamps.last().end).withoutVoice()
+        val (body, voiceNumber) = source.substring(stamps.last().end).withoutVoice()
         val timed = readWordTimes(body)
         if (timed.text.isBlank()) return
 
-        // Unprefixed lines are the first singer, so a v1 line after them is the second.
+        // Unprefixed lines are the first singer. `v2:` is the second singer, `v3:` a group
+        // (Gramophone's convention), `v1:` the legacy second singer of older files, and
+        // `v4:` onward the third, fourth, ... singers.
         val singer =
-            voice?.let {
-                singers.getOrPut(it) {
-                    if (hasUnprefixedVoice) singers.size + 1 else singers.size
-                }
-            } ?: 0
+            when (voiceNumber) {
+                null -> 0
+                1 -> if (hasUnprefixedVoice) 1 else 0
+                2 -> 1
+                3 -> LyricLine.NO_SINGER
+                else -> voiceNumber - 2
+            }
+        val side = if (voiceNumber == 3) Voice.GROUP else Voice.PRIMARY
         val firstStartMs = stamps.first().ms
         stamps.forEach { stamp ->
             val words = timed.words.shiftedTo(stamp.ms, firstStartMs)
@@ -110,6 +113,7 @@ private class LrcLineReader(private val hasUnprefixedVoice: Boolean) {
                     endMs = words.lastOrNull()?.endMs ?: LyricLine.UNTIMED,
                     text = timed.text,
                     words = words,
+                    voice = side,
                     singer = singer,
                 )
         }

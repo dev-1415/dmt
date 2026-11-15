@@ -52,6 +52,8 @@ internal fun NowPlayingPage(
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var detailsAtTop by remember { mutableStateOf(true) }
     val steps = rememberSeekSteps()
+    // One seek hold for the bar and the lyrics, so dragging the bar moves the highlight too.
+    val hold = rememberSeekHold(player, active && rememberIsPlaying(player))
     val wide = windowShape().wide
     val paint by animateFieldAsState(field)
     // Gramophone uses the content-based Material surface directly, without a second darkening.
@@ -95,9 +97,9 @@ internal fun NowPlayingPage(
                 LyricsPanel(
                     state = state,
                     player = player,
+                    hold = hold,
                     dispatch = dispatch,
                     background = playerBackground,
-                    active = active,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -127,11 +129,11 @@ internal fun NowPlayingPage(
                         state = state,
                         player = player,
                         steps = steps,
+                        hold = hold,
                         field = playerBackground,
                         dispatch = dispatch,
                         cover = null,
                         lyricsOpen = showLyrics,
-                        active = active,
                         onOpenArtist = onOpenArtist,
                         onOpenAlbum = onOpenAlbum,
                         onOpenDetails = {
@@ -147,11 +149,11 @@ internal fun NowPlayingPage(
                 state = state,
                 player = player,
                 steps = steps,
+                hold = hold,
                 field = playerBackground,
                 dispatch = dispatch,
                 cover = cover,
                 lyricsOpen = showLyrics,
-                active = active,
                 onOpenArtist = onOpenArtist,
                 onOpenAlbum = onOpenAlbum,
                 onOpenDetails = {

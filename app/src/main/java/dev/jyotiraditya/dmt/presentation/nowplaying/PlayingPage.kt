@@ -58,6 +58,7 @@ import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.player.nowPlayingTrack
 import dev.jyotiraditya.dmt.presentation.nowplaying.lyrics.CurrentLyricLine
+import dev.jyotiraditya.dmt.presentation.nowplaying.lyrics.rememberLyricPosition
 import dev.jyotiraditya.dmt.ui.components.Artwork
 import dev.jyotiraditya.dmt.ui.components.QualityBadge
 import dev.jyotiraditya.dmt.ui.components.SeekBar
@@ -85,11 +86,11 @@ internal fun PlayingPage(
     state: DmtState,
     player: Player,
     steps: SeekSteps,
+    hold: SeekHold,
     field: Color,
     dispatch: (DmtAction) -> Unit,
     cover: (@Composable () -> Unit)?,
     lyricsOpen: Boolean,
-    active: Boolean,
     onOpenArtist: () -> Unit,
     onOpenAlbum: () -> Unit,
     onOpenDetails: () -> Unit,
@@ -97,6 +98,7 @@ internal fun PlayingPage(
 ) {
     val ink = field.inkOn()
     val dim = ink.secondary(field)
+    val lyricPosition = rememberLyricPosition(hold, state.settings.lyricsOffsetMs)
     var volumeAnchor by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Box(modifier = Modifier.fillMaxSize()) {
         PlayingLayout(
@@ -122,9 +124,8 @@ internal fun PlayingPage(
                     ) {
                         CurrentLyricLine(
                             state = state,
-                            player = player,
+                            position = lyricPosition,
                             background = field,
-                            active = active,
                             onClick = onToggleLyrics,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -132,7 +133,7 @@ internal fun PlayingPage(
                     TrackTitle(state, ink, dim, onOpenArtist)
                 }
             },
-            seek = { SeekRow(state, player, field, ink, dim, active) },
+            seek = { SeekRow(state, player, hold, field, ink, dim) },
             transport = {
                 Transport(
                     player = player,
@@ -284,15 +285,12 @@ private fun TrackTitle(
 private fun SeekRow(
     state: DmtState,
     player: Player,
+    hold: SeekHold,
     field: Color,
     ink: Color,
     dim: Color,
-    active: Boolean,
 ) {
     var width by remember { mutableIntStateOf(0) }
-    // Poll only while this page is on screen; off-screen the bar costs nothing.
-    val moving = active && rememberIsPlaying(player)
-    val hold = rememberSeekHold(player, moving)
     val cue = state.nowPlayingTrack?.cue == true
     // The text changes once a second, so the 20 fps position only redraws the bar.
     val shownSeconds by remember(hold) { derivedStateOf { hold.shownMs() / 1000 } }

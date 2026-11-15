@@ -1,18 +1,21 @@
 package dev.jyotiraditya.dmt.presentation.nowplaying
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,11 +32,14 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import androidx.media3.ui.compose.state.rememberPlayPauseButtonState
 import dev.jyotiraditya.dmt.R
@@ -43,15 +49,21 @@ import dev.jyotiraditya.dmt.ui.components.Block
 import dev.jyotiraditya.dmt.ui.components.EmptyState
 import dev.jyotiraditya.dmt.ui.components.IconTap
 import dev.jyotiraditya.dmt.ui.components.SeekBar
+import dev.jyotiraditya.dmt.ui.components.TextLink
+import dev.jyotiraditya.dmt.ui.components.pressable
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ground
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
 import dev.jyotiraditya.dmt.ui.theme.Muted
+import dev.jyotiraditya.dmt.ui.theme.Surface
+import dev.jyotiraditya.dmt.ui.theme.Surface2
 import dev.jyotiraditya.dmt.util.asTime
 import dev.jyotiraditya.lyrics.LyricLine
+import dev.jyotiraditya.lyrics.LyricWord
 import dev.jyotiraditya.lyrics.Lyrics
+import java.util.Locale
 
 /**
  * Times and edits lyrics against the audio: a clock beside each line, word start and end clocks
@@ -67,7 +79,8 @@ internal fun LyricsTimingEditor(
     modifier: Modifier = Modifier,
 ) {
     val original = state.lyrics
-    var lyrics by remember(original) { mutableStateOf(original) }
+    // Keep the edits local to this editor; a background lyrics reload must not discard them.
+    var lyrics by remember { mutableStateOf(original) }
     val current = lyrics
     if (current == null) {
         EmptyState(
@@ -104,6 +117,9 @@ internal fun LyricsTimingEditor(
                     onWordTextChange = { word, text ->
                         lyrics = lyrics?.updateLine(index) { it.replaceWord(word, text) }
                     },
+                    onAddWord = { text, at, after ->
+                        lyrics = lyrics?.updateLine(index) { it.addWord(text, at, after) }
+                    },
                     onPlayFrom = { at ->
                         player?.let {
                             it.seekTo(at.coerceAtLeast(0L))
@@ -116,7 +132,8 @@ internal fun LyricsTimingEditor(
         Block(
             label = stringResource(R.string.lyrics_edit_save),
             onClick = {
-                dispatch(DmtAction.SaveTimedLyrics(current))
+                // Read the state at click time, so a word added just before the tap is saved.
+                lyrics?.let { dispatch(DmtAction.SaveTimedLyrics(it)) }
                 onDismiss()
             },
             modifier = Modifier.padding(horizontal = Margin, vertical = 12.dp),
@@ -141,13 +158,22 @@ private fun TimingLineRow(
     onSetWordEnd: (Int, Long) -> Unit,
     onTextChange: (String) -> Unit,
     onWordTextChange: (Int, String) -> Unit,
+    onAddWord: (String, Long, Int?) -> Unit,
     onPlayFrom: (Long) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var editingLine by remember { mutableStateOf(false) }
     var editingWord by remember { mutableStateOf<Int?>(null) }
+    var addingAfter by remember { mutableStateOf<Int?>(null) }
+    var addingAtEnd by remember { mutableStateOf(false) }
     val hasWords = line.words.isNotEmpty()
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Margin, vertical = 6.dp)) {
+    Column(
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(horizontal = Margin, vertical = 6.dp)
+                .background(Surface2, RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (editingLine) {
                 InlineTextField(
@@ -194,6 +220,17 @@ private fun TimingLineRow(
                     )
                 }
                 IconTap(
+                    icon = DmtIcons.Plus,
+                    description = stringResource(R.string.lyrics_timing_add_word),
+                    onClick = {
+                        expanded = true
+                        addingAtEnd = true
+                    },
+                    ink = Muted,
+                    size = 40.dp,
+                    iconSize = 20.dp,
+                )
+                IconTap(
                     icon = DmtIcons.Play,
                     description = stringResource(R.string.lyrics_timing_play_line),
                     onClick = { onPlayFrom(line.startMs) },
@@ -219,7 +256,11 @@ private fun TimingLineRow(
                 val end = word.end.coerceIn(start, line.text.length)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(start = 16.dp, top = 4.dp)
+                            .background(Surface, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     if (editingWord == index) {
                         InlineTextField(
@@ -232,61 +273,113 @@ private fun TimingLineRow(
                             modifier = Modifier.weight(1f),
                         )
                     } else {
-                        Text(
-                            text = line.text.substring(start, end),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Ink,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconTap(
-                            icon = DmtIcons.Edit,
-                            description = stringResource(R.string.lyrics_timing_edit_word),
-                            onClick = { editingWord = index },
-                            ink = Muted,
-                            size = 36.dp,
-                            iconSize = 18.dp,
-                        )
                         IconTap(
                             icon = DmtIcons.Play,
                             description = stringResource(R.string.lyrics_timing_play_word),
                             onClick = { onPlayFrom(word.startMs) },
                             ink = Muted,
-                            size = 36.dp,
-                            iconSize = 18.dp,
+                            size = 32.dp,
+                            iconSize = 16.dp,
                             enabled = position != null && word.startMs != LyricLine.UNTIMED,
                         )
                         Text(
-                            text = word.startMs.asTimeOrDash(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Muted,
+                            text = line.text.substring(start, end),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                Modifier.weight(1f)
+                                    .pressable(
+                                        onClick = { editingWord = index },
+                                        label = stringResource(R.string.lyrics_timing_edit_word),
+                                    )
+                                    .padding(horizontal = 4.dp),
                         )
-                        IconTap(
-                            icon = DmtIcons.Clock,
-                            description = stringResource(R.string.lyrics_timing_set_word_start),
+                        TimeChip(
+                            time = word.startMs,
                             onClick = { position?.let { onSetWordStart(index, it.value) } },
-                            ink = Muted,
-                            size = 36.dp,
-                            iconSize = 18.dp,
-                            enabled = position != null,
                         )
-                        Text(
-                            text = word.endMs.asTimeOrDash(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Muted,
+                        TimeChip(
+                            time = word.endMs,
+                            onClick = { position?.let { onSetWordEnd(index, it.value) } },
                         )
                         IconTap(
-                            icon = DmtIcons.Clock,
-                            description = stringResource(R.string.lyrics_timing_set_word_end),
-                            onClick = { position?.let { onSetWordEnd(index, it.value) } },
+                            icon = DmtIcons.Plus,
+                            description = stringResource(R.string.lyrics_timing_add_word),
+                            onClick = { addingAfter = index },
                             ink = Muted,
-                            size = 36.dp,
-                            iconSize = 18.dp,
-                            enabled = position != null,
+                            size = 32.dp,
+                            iconSize = 16.dp,
+                        )
+                    }
+                }
+                if (addingAfter == index) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
+                    ) {
+                        InlineTextField(
+                            initial = "",
+                            onCommit = {
+                                onAddWord(it, position?.value ?: word.endMs, index)
+                                addingAfter = null
+                            },
+                            onCancel = { addingAfter = null },
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
             }
+            if (addingAtEnd) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
+                ) {
+                    InlineTextField(
+                        initial = "",
+                        onCommit = {
+                            onAddWord(it, position?.value ?: line.endMs, null)
+                            addingAtEnd = false
+                        },
+                        onCancel = { addingAtEnd = false },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            } else {
+                TextLink(
+                    label = stringResource(R.string.lyrics_timing_add_word),
+                    onClick = { addingAtEnd = true },
+                    color = LocalCoverColors.current.primary,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                )
+            }
         }
+    }
+}
+
+/** A small tappable clock and time; tapping it sets the word's start or end to the player. */
+@Composable
+private fun TimeChip(time: Long, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier.pressable(onClick = onClick, label = time.asTimeOrDash())
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+    ) {
+        Icon(
+            painter = painterResource(DmtIcons.Clock),
+            contentDescription = null,
+            tint = Muted,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(modifier = Modifier.width(2.dp))
+        Text(
+            text = time.asTimeOrDash(),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = Muted,
+            maxLines = 1,
+        )
     }
 }
 
@@ -441,6 +534,44 @@ private fun LyricLine.withWordBounds(): LyricLine {
     )
 }
 
+/** How long a newly added word lasts until its end is timed. */
+private const val DEFAULT_WORD_MS = 500L
+
+/**
+ * Inserts a word after the word at [after], or at the end when [after] is null, timed at [atMs]
+ * and lasting [DEFAULT_WORD_MS]. The words after the insertion move right with the text.
+ */
+internal fun LyricLine.addWord(text: String, atMs: Long, after: Int?): LyricLine {
+    val word = text.trim()
+    if (word.isEmpty()) return this
+    val anchor = after?.let { words.getOrNull(it) }
+    val insertAt = anchor?.end?.coerceIn(0, this.text.length) ?: this.text.length
+    val needsSpace = insertAt > 0 && !this.text[insertAt - 1].isWhitespace()
+    val prefix = if (needsSpace) " " else ""
+    val newText = this.text.substring(0, insertAt) + prefix + word + this.text.substring(insertAt)
+    val start = insertAt + prefix.length
+    val end = start + word.length
+    val delta = prefix.length + word.length
+    val moved =
+        words.map { current ->
+            if (current.start >= insertAt) {
+                current.copy(start = current.start + delta, end = current.end + delta)
+            } else {
+                current
+            }
+        }
+    val anchorEnd = anchor?.endMs ?: words.lastOrNull()?.endMs ?: startMs
+    val wordStart = maxOf(atMs, anchorEnd).coerceAtLeast(0L)
+    val wordEnd = wordStart + DEFAULT_WORD_MS
+    return copy(
+        text = newText,
+        words =
+            (moved + LyricWord(wordStart, wordEnd, start, end, background = false))
+                .sortedBy { it.start },
+        endMs = maxOf(endMs, wordEnd),
+    )
+}
+
 /** Replaces one word's text and shifts the offsets of the words after it. */
 private fun LyricLine.replaceWord(index: Int, newText: String): LyricLine {
     val word = words.getOrNull(index) ?: return this
@@ -461,4 +592,13 @@ private fun LyricLine.replaceWord(index: Int, newText: String): LyricLine {
 }
 
 private fun Long.asTimeOrDash(): String =
-    if (this == LyricLine.UNTIMED) "--:--" else asTime()
+    if (this == LyricLine.UNTIMED) "--:--" else asTimeWithMillis()
+
+/** `mm:ss.SSS`, so the editor shows the sub-second part the LRC keeps. */
+private fun Long.asTimeWithMillis(): String {
+    val totalSeconds = this / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    val millis = this % 1000
+    return String.format(Locale.US, "%02d:%02d.%03d", minutes, seconds, millis)
+}
