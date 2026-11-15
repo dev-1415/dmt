@@ -16,10 +16,10 @@
     <td width="20%"><img src=".github/screenshots/lyrics.jpg" alt="Lyrics on the Now Playing screen" /></td>
     <td width="20%"><img src=".github/screenshots/queue.jpg" alt="Up next" /></td>
     <td width="20%"><img src=".github/screenshots/lyrics-source.jpg" alt="Lyrics source" /></td>
-    <td width="20%"><img src=".github/screenshots/lyrics-offset.jpg" alt="Shifting the lyric offset" /></td>
+    <td width="20%"><img src=".github/screenshots/lyrics-offset.jpg" alt="Sorting the queue" /></td>
   </tr>
   <tr>
-    <td width="20%"><img src=".github/screenshots/lyrics-edit.jpg" alt="Editing lyrics and timing" /></td>
+    <td width="20%"><img src=".github/screenshots/lyrics-edit.jpg" alt="Timing lyrics against the audio" /></td>
     <td width="20%"><img src=".github/screenshots/playlists.jpg" alt="Playlists" /></td>
     <td width="20%"><img src=".github/screenshots/playlist-actions.jpg" alt="Playlist actions" /></td>
     <td width="20%"><img src=".github/screenshots/settings.jpg" alt="Settings" /></td>
