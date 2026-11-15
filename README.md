@@ -38,10 +38,12 @@ These are the changes this fork adds on top of dmt 2.0.
 - **Library tabs in your order.** Pick which sections appear as tabs and move them up and down in
   settings; the bottom bar follows that order. Folder and playlist cards carry a collage of their
   albums, and a playlist spanning several albums gets a mosaic.
-- **Lyrics you can edit and keep.** Shift the lyrics against the audio, edit the words, or open
-  the raw timing, then write the result into the file. Plain LRC goes in the lyrics tag for any
-  player, and the word-timed copy goes in a standard TTML sidecar, so word timing, translations
-  and backing vocals survive; a shifted lyric is written back with its timing intact.
+- **Lyrics you can edit and keep.** Shift the lyrics against the audio, edit the words, or time
+  every line and word against what you hear in the built-in timing editor, then write the result
+  into the file as enhanced LRC: plain lines any player can read, with word timing, translations
+  and backing vocals intact.
+- **Speed and pitch, per track.** Slow a song down to learn it or lift its key in semitones, then
+  save the pair for that one file or clear it to fall back to the global speed.
 - **Better app navigation.** A bottom bar with icon tabs and a sliding mark, a back link above the
   page, a second tap on Folders or Playlists returning to the top of that section, and a queue that
   scrolls to the track that is playing.
