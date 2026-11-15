@@ -45,7 +45,7 @@ fun FlatSlider(
             onValueChange = onValueChange,
             valueRange = range,
             modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
-            thumb = { Box(modifier = Modifier.size(Thumb).background(Ink)) },
+            thumb = { Box(modifier = Modifier.size(Thumb).background(accent.primary)) },
             track = { slider ->
                 Canvas(modifier = Modifier.fillMaxWidth().height(Bar)) {
                     drawRect(Surface2)

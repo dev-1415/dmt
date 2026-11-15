@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
@@ -38,8 +39,10 @@ import dev.jyotiraditya.dmt.domain.usecase.ScanLibraryUseCase
 import dev.jyotiraditya.dmt.util.notificationPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -73,6 +76,7 @@ class PlaybackService : MediaLibraryService() {
     private val gainCache = LruCache<Long, Float>(512)
     private var shufflePlan: ShufflePlan? = null
     private var pendingShuffle: LastSession? = null
+    private var saveJob: Job? = null
 
     /** Whether a controller just set a new queue, to shuffle once it has loaded. */
     private var queueReplaced = false
@@ -227,7 +231,20 @@ class PlaybackService : MediaLibraryService() {
             saveSession()
             applyReplayGain(mediaItem)
             updateWakeMode(player, mediaItem)
-            player.applyOffloadPolicy(mediaItem)
+            player.applyOffloadPolicy(
+                mediaItem,
+                player.playbackParameters.speed,
+                player.playbackParameters.pitch,
+            )
+        }
+
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            // A pitch or speed shift needs the PCM processor, so offload must follow it.
+            player.applyOffloadPolicy(
+                player.currentMediaItem,
+                playbackParameters.speed,
+                playbackParameters.pitch,
+            )
         }
 
         override fun onAudioSessionIdChanged(audioSessionId: Int) {
@@ -366,23 +383,27 @@ class PlaybackService : MediaLibraryService() {
         scanLibrary.current()
     }
 
-    /** Saves the queue and position for resuming later. */
-    private fun saveSession() {
+    /** Saves the queue and position for resuming later, coalescing rapid changes. */
+    private fun saveSession(immediate: Boolean = false) {
         val player = mediaSession?.player ?: return
         if (player.mediaItemCount == 0) return
-        val ids =
-            (0 until player.mediaItemCount).mapNotNull {
-                player.getMediaItemAt(it).mediaId.toLongOrNull()
-            }
-        val session =
-            LastSession(
-                queueIds = ids,
-                index = player.currentMediaItemIndex,
-                positionMs = player.currentPosition.coerceAtLeast(0L),
-                shuffle = player.shuffleModeEnabled,
-                shuffleOrder = shufflePlan?.toString().orEmpty(),
-            )
-        scope.launch { preferencesRepository.saveSession(session) }
+        saveJob?.cancel()
+        saveJob = scope.launch {
+            if (!immediate) delay(750)
+            val ids =
+                (0 until player.mediaItemCount).mapNotNull {
+                    player.getMediaItemAt(it).mediaId.toLongOrNull()
+                }
+            val session =
+                LastSession(
+                    queueIds = ids,
+                    index = player.currentMediaItemIndex,
+                    positionMs = player.currentPosition.coerceAtLeast(0L),
+                    shuffle = player.shuffleModeEnabled,
+                    shuffleOrder = shufflePlan?.toString().orEmpty(),
+                )
+            preferencesRepository.saveSession(session)
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? =
@@ -390,7 +411,7 @@ class PlaybackService : MediaLibraryService() {
 
     /** Keeps playing after the app is swiped away, unless paused or set to stop. */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        saveSession()
+        saveSession(immediate = true)
         val player = mediaSession?.player
         val keepPlaying =
             player != null && !stopOnDismiss && player.playWhenReady && player.mediaItemCount > 0

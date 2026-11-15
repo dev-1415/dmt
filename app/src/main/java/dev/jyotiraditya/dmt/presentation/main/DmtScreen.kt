@@ -104,6 +104,7 @@ fun DmtScreen(
         }
     val pager = rememberPagerState(pageCount = { visiblePlaces.size })
     val place = visiblePlaces.getOrNull(pager.currentPage) ?: visiblePlaces.first()
+    val rail = windowShape().rail
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     // A search field must not reopen the keyboard when the app comes back to the foreground.
@@ -111,7 +112,10 @@ fun DmtScreen(
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var settingsReturn by rememberSaveable { mutableStateOf(Place.QUEUE.ordinal) }
     var queueScrollRequest by remember { mutableStateOf(false) }
-    val selected = if (settingsOpen) null else pager.currentPage + pager.currentPageOffsetFraction
+    // Only the rail draws a continuous selection, so phones must not read the offset here:
+    // reading it would recompose the whole screen on every frame of a pager swipe.
+    val selected =
+        if (!rail || settingsOpen) null else pager.currentPage + pager.currentPageOffsetFraction
 
     fun go(next: Place) {
         val target =
@@ -232,7 +236,6 @@ fun DmtScreen(
 
     CompositionLocalProvider(LocalArtwork provides artwork, LocalPlayer provides player) {
         Column(modifier = Modifier.fillMaxSize().imePadding()) {
-            val rail = windowShape().rail
             val openPlace = { next: Place ->
                 if (settingsOpen) closeSettings()
                 if (next == Place.QUEUE) queueScrollRequest = true
@@ -393,6 +396,7 @@ fun DmtScreen(
             LyricsSourceSheet(
                 state = state,
                 dispatch = dispatch,
+                player = player,
                 trackTitle = state.title,
                 current = state.lyricsShowingFrom ?: state.lyricsSource,
                 sources = state.lyricsSources,

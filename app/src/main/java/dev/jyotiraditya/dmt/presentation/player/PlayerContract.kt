@@ -98,6 +98,8 @@ data class DmtState(
     val sleepEndAt: Long = 0L,
     /** Whether the running sleep timer lets the song playing at [sleepEndAt] finish. */
     val sleepFinishSong: Boolean = false,
+    /** The pitch shift in semitones applied to the playing track. */
+    val pitchSemitones: Int = 0,
     val settings: DmtSettings = DmtSettings(),
     val settingsLoaded: Boolean = false,
     val stats: DmtStats = DmtStats(),
@@ -141,10 +143,8 @@ val DmtState.nowPlayingTrack: Track?
 sealed interface DmtAction {
     data class Permission(val granted: Boolean) : DmtAction
 
+    /** Re-indexes missing files, then reads the library again. */
     data object Rescan : DmtAction
-
-    /** Re-indexes every audio file in the library, then rescans it. */
-    data object RepairIndex : DmtAction
 
     data class Query(val value: String) : DmtAction
 
@@ -218,8 +218,10 @@ sealed interface DmtAction {
     data class SaveLyrics(
         val text: String,
         val raw: Boolean = false,
-        val ttml: String? = null,
     ) : DmtAction
+
+    /** Writes lyrics whose line or word times were edited in the timing editor. */
+    data class SaveTimedLyrics(val lyrics: Lyrics) : DmtAction
 
     data object CloseLyricsSources : DmtAction
 
@@ -232,6 +234,14 @@ sealed interface DmtAction {
     data object SleepAtSongEnd : DmtAction
 
     data class SetSpeed(val speed: Float) : DmtAction
+
+    data class SetPitch(val semitones: Int) : DmtAction
+
+    /** Saves the current speed and pitch for the playing file only. */
+    data object SaveTrackAudio : DmtAction
+
+    /** Drops the playing file's saved speed and pitch. */
+    data object ClearTrackAudio : DmtAction
 
     data class Config(val settings: DmtSettings) : DmtAction
 

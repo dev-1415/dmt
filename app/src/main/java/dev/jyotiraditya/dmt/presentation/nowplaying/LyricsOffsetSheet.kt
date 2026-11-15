@@ -4,11 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,20 +23,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.media3.common.Player
 import dev.jyotiraditya.dmt.R
-import dev.jyotiraditya.dmt.data.lyrics.LyricsEmbedder
+import dev.jyotiraditya.dmt.presentation.main.BackBar
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.ui.components.Block
-import dev.jyotiraditya.dmt.ui.components.DmtSheet
 import dev.jyotiraditya.dmt.ui.components.FlatSlider
-import dev.jyotiraditya.dmt.ui.components.SheetHeader
 import dev.jyotiraditya.dmt.ui.components.Stepper
+import dev.jyotiraditya.dmt.ui.components.TextLink
 import dev.jyotiraditya.dmt.ui.components.pressable
+import dev.jyotiraditya.dmt.ui.theme.Ground
 import dev.jyotiraditya.dmt.ui.theme.Ink
 import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.Margin
@@ -51,28 +58,46 @@ private const val OFFSET_STEP_MS = 50
 internal fun LyricsOffsetSheet(
     state: DmtState,
     dispatch: (DmtAction) -> Unit,
+    player: Player?,
     onDismiss: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(0) }
-    DmtSheet(onDismiss = onDismiss) {
-        val scheme = LocalCoverColors.current
-        SheetHeader(
-            title = stringResource(R.string.lyrics_edit_title),
-            meta = stringResource(R.string.lyrics_edit_hint),
-            titleColor = scheme.primary,
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Margin, vertical = 8.dp),
-        ) {
-            TabLabel(stringResource(R.string.lyrics_offset_tab), tab == 0) { tab = 0 }
-            TabLabel(stringResource(R.string.lyrics_edit_tab), tab == 1) { tab = 1 }
-            TabLabel(stringResource(R.string.lyrics_timing_tab), tab == 2) { tab = 2 }
-        }
-        when (tab) {
-            0 -> OffsetTab(state, dispatch)
-            1 -> EditTab(state, dispatch, onDismiss)
-            else -> TimingTab(state, dispatch, onDismiss)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Ground) {
+            Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+                BackBar(
+                    label = stringResource(R.string.lyrics_edit_title),
+                    field = Ground,
+                    onBack = onDismiss,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Margin, vertical = 8.dp),
+                ) {
+                    TabLabel(stringResource(R.string.lyrics_offset_tab), tab == 0) { tab = 0 }
+                    TabLabel(stringResource(R.string.lyrics_timing_tab), tab == 1) { tab = 1 }
+                    TabLabel(stringResource(R.string.lyrics_text_tab), tab == 2) { tab = 2 }
+                }
+                when (tab) {
+                    0 -> OffsetTab(state, dispatch)
+                    1 ->
+                        LyricsTimingEditor(
+                            state = state,
+                            dispatch = dispatch,
+                            player = player,
+                            onDismiss = onDismiss,
+                            modifier = Modifier.weight(1f),
+                        )
+                    else -> TextTab(state, dispatch, onDismiss, Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -123,17 +148,7 @@ private fun OffsetTab(state: DmtState, dispatch: (DmtAction) -> Unit) {
         onClick = {
             val shifted = lyrics?.shiftBy(offset.toLong())
             if (shifted != null) {
-                val shiftedTtml =
-                    lyrics.raw
-                        ?.takeIf { it.trimStart().startsWith("<") }
-                        ?.let { LyricsEmbedder.shiftTtmlTimes(it, offset.toLong()) }
-                dispatch(
-                    DmtAction.SaveLyrics(
-                        shifted.toLrc(),
-                        raw = true,
-                        ttml = shiftedTtml,
-                    )
-                )
+                dispatch(DmtAction.SaveLyrics(shifted.toLrc(), raw = true))
                 dispatch(DmtAction.Config(state.settings.copy(lyricsOffsetMs = 0)))
             }
         },
@@ -142,86 +157,85 @@ private fun OffsetTab(state: DmtState, dispatch: (DmtAction) -> Unit) {
     )
 }
 
+/** The whole lyrics as plain text, with copy and paste, for a file that has none yet. */
 @Composable
-private fun EditTab(state: DmtState, dispatch: (DmtAction) -> Unit, onDismiss: () -> Unit) {
-    val original = state.lyrics
-    var text by
-        remember(original) {
-            mutableStateOf(original?.lines?.joinToString("\n") { it.text }.orEmpty())
-        }
-    LyricsEditor(
-        text = text,
-        onTextChange = { text = it },
-        onSave = {
-            dispatch(DmtAction.SaveLyrics(text))
-            onDismiss()
-        },
-    )
-}
-
-@Composable
-private fun TimingTab(state: DmtState, dispatch: (DmtAction) -> Unit, onDismiss: () -> Unit) {
-    val original = state.lyrics
-    val isTtml = original?.raw?.trimStart()?.startsWith("<") == true
-    var text by
-        remember(original) {
-            mutableStateOf(if (isTtml) original?.raw.orEmpty() else original?.toLrc().orEmpty())
-        }
-    LyricsEditor(
-        text = text,
-        format = if (isTtml) "TTML" else "LRC",
-        onTextChange = { text = it },
-        onSave = {
-            dispatch(DmtAction.SaveLyrics(text, raw = true))
-            onDismiss()
-        },
-    )
-}
-
-@Composable
-private fun LyricsEditor(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onSave: () -> Unit,
-    format: String? = null,
+private fun TextTab(
+    state: DmtState,
+    dispatch: (DmtAction) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val original = state.lyrics
     val scheme = LocalCoverColors.current
+    val clipboard = LocalClipboardManager.current
     val focusRequester = remember { FocusRequester() }
-    var value by
-        remember {
-            mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    val initial =
+        original?.raw?.takeIf { it.isNotBlank() }
+            ?: original?.toLrc().orEmpty()
+    var text by rememberSaveable(original) { mutableStateOf(initial) }
+    var value by remember { mutableStateOf(TextFieldValue(text, selection = TextRange(text.length))) }
+    val format =
+        when {
+            text.trimStart().startsWith("<") -> "TTML"
+            text.lineSequence().any { it.trimStart().startsWith("[") } -> "LRC"
+            else -> "Text"
         }
-    // Put the cursor in the field as soon as the tab opens, so it is visible without a tap.
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Margin)) {
-        if (format != null) {
-            Text(
-                text = format,
-                style = MaterialTheme.typography.labelMedium,
-                color = Muted,
-                modifier = Modifier.padding(bottom = 8.dp),
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = Margin)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        ) {
+            TextLink(
+                label = stringResource(R.string.lyrics_text_copy),
+                onClick = { clipboard.setText(AnnotatedString(text)) },
+            )
+            TextLink(
+                label = stringResource(R.string.lyrics_text_paste),
+                onClick = {
+                    clipboard.getText()?.text?.let {
+                        text = it
+                        value = TextFieldValue(it, selection = TextRange(it.length))
+                    }
+                },
+            )
+            TextLink(
+                label = stringResource(R.string.lyrics_text_clear),
+                onClick = {
+                    text = ""
+                    value = TextFieldValue("")
+                },
             )
         }
+        Text(
+            text = format,
+            style = MaterialTheme.typography.labelMedium,
+            color = Muted,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
         BasicTextField(
             value = value,
             onValueChange = {
                 value = it
-                onTextChange(it.text)
+                text = it.text
             },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = Ink),
             cursorBrush = SolidColor(scheme.primary),
             modifier =
                 Modifier.fillMaxWidth()
-                    .heightIn(min = 160.dp, max = 360.dp)
+                    .weight(1f)
                     .background(scheme.surfaceContainer)
                     .padding(16.dp)
                     .focusRequester(focusRequester),
         )
         Block(
             label = stringResource(R.string.lyrics_edit_save),
-            onClick = onSave,
-            enabled = value.text.isNotBlank(),
-            modifier = Modifier.padding(vertical = 16.dp),
+            onClick = {
+                dispatch(DmtAction.SaveLyrics(text, raw = true))
+                onDismiss()
+            },
+            enabled = text.isNotBlank(),
+            modifier = Modifier.padding(vertical = 12.dp),
         )
     }
 }

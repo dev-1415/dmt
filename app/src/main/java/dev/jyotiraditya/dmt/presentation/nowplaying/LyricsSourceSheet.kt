@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.Player
 import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.LyricsSource
 import dev.jyotiraditya.dmt.domain.model.LyricsTiming
@@ -43,6 +44,7 @@ import dev.jyotiraditya.dmt.ui.theme.Muted
 fun LyricsSourceSheet(
     state: DmtState,
     dispatch: (DmtAction) -> Unit,
+    player: Player?,
     trackTitle: String,
     current: LyricsSource,
     sources: Map<LyricsSource, LyricsSourceStatus>,
@@ -53,7 +55,7 @@ fun LyricsSourceSheet(
 ) {
     var offsetOpen by remember { mutableStateOf(false) }
     if (offsetOpen) {
-        LyricsOffsetSheet(state, dispatch, onDismiss = { offsetOpen = false })
+        LyricsOffsetSheet(state, dispatch, player, onDismiss = { offsetOpen = false })
     }
     DmtSheet(onDismiss = onDismiss) {
         val scheme = LocalCoverColors.current

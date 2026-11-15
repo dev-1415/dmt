@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -131,7 +132,7 @@ internal fun PlayingPage(
                     TrackTitle(state, ink, dim, onOpenArtist)
                 }
             },
-            seek = { SeekRow(state, player, field, ink, dim) },
+            seek = { SeekRow(state, player, field, ink, dim, active) },
             transport = {
                 Transport(
                     player = player,
@@ -280,12 +281,21 @@ private fun TrackTitle(
 /** The seek bar with elapsed and remaining time, and the track's tags between them. */
 @OptIn(UnstableApi::class)
 @Composable
-private fun SeekRow(state: DmtState, player: Player, field: Color, ink: Color, dim: Color) {
+private fun SeekRow(
+    state: DmtState,
+    player: Player,
+    field: Color,
+    ink: Color,
+    dim: Color,
+    active: Boolean,
+) {
     var width by remember { mutableIntStateOf(0) }
-    val hold = rememberSeekHold(player, width)
-    val clock = rememberProgressStateWithTickInterval(player, tickIntervalMs = 1000L)
+    // Poll only while this page is on screen; off-screen the bar costs nothing.
+    val moving = active && rememberIsPlaying(player)
+    val hold = rememberSeekHold(player, moving)
     val cue = state.nowPlayingTrack?.cue == true
-    val shown = hold.shownMs(clock.currentPositionMs)
+    // The text changes once a second, so the 20 fps position only redraws the bar.
+    val shownSeconds by remember(hold) { derivedStateOf { hold.shownMs() / 1000 } }
     val primary = LocalCoverColors.current.primary
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -299,7 +309,7 @@ private fun SeekRow(state: DmtState, player: Player, field: Color, ink: Color, d
         )
         Box(modifier = Modifier.fillMaxWidth().padding(top = PlayerDimens.LineGap)) {
             Text(
-                text = shown.asTime(),
+                text = (shownSeconds * 1000).asTime(),
                 style = Numerals,
                 color = dim,
                 modifier = Modifier.align(Alignment.CenterStart),

@@ -50,7 +50,7 @@ class LyricsLrcTest {
     }
 
     @Test
-    fun `backing words keep their flag and last word end`() {
+    fun `backing words become a standard bg line`() {
         val line =
             LyricLine(
                 startMs = 1_000,
@@ -63,14 +63,23 @@ class LyricsLrcTest {
                     ),
             )
         val lrc = Lyrics(listOf(line), synced = true).toLrc()
-        assertEquals(
-            "[00:01.00]<00:01.00>Hello (<00:01.50 bg>ooh)<00:03.00>",
-            lrc,
-        )
+        assertTrue(lrc.contains("[bg: [00:01.00]"))
+        assertTrue(lrc.contains("<00:01.50>ooh<00:03.00>"))
 
-        val parsed = LyricsParser.parse(lrc)!!.lines.single()
-        assertEquals(listOf(false, true), parsed.words.map { it.background })
-        assertEquals(3_000, parsed.words.last().endMs)
+        val background =
+            LyricsParser.parse(lrc)!!.lines.flatMap { it.words }.filter { it.background }
+        assertEquals(1, background.size)
+        assertEquals(3_000, background.single().endMs)
+    }
+
+    @Test
+    fun `bg line keeps the main line start after an offset`() {
+        val lrc =
+            "[00:01.00]<00:01.00>Hello<00:02.00>\n" +
+                "[bg: [00:01.00]<00:01.50>ooh<00:02.00>]"
+        val shifted = LyricsParser.parse(lrc)!!.shiftBy(500)
+        val out = shifted.toLrc()
+        assertTrue(out.contains("[bg: [00:01.50]"))
     }
 
     @Test
@@ -80,8 +89,13 @@ class LyricsLrcTest {
         val lrc = lyrics.toLrc()
         assertTrue(lrc.contains("v1:"))
         val parsed = LyricsParser.parse(lrc)!!
-        assertEquals(lyrics.lines.size, parsed.lines.size)
-        lyrics.lines.zip(parsed.lines).forEach { (expected, actual) ->
+        // Backing vocals become their own [bg: ...] lines, so compare the main lines only.
+        val expectedMain =
+            lyrics.lines.filter { line -> line.words.isEmpty() || line.words.any { !it.background } }
+        val actualMain =
+            parsed.lines.filter { line -> line.words.isEmpty() || line.words.any { !it.background } }
+        assertEquals(expectedMain.size, actualMain.size)
+        expectedMain.zip(actualMain).forEach { (expected, actual) ->
             if (expected.voice != Voice.GROUP) {
                 assertEquals(expected.voice, actual.voice)
             }

@@ -37,6 +37,7 @@ import dev.jyotiraditya.dmt.data.source.local.KEY_STAT_COUNTS
 import dev.jyotiraditya.dmt.data.source.local.KEY_STAT_TOTAL
 import dev.jyotiraditya.dmt.data.source.local.KEY_STOP_ON_DISMISS
 import dev.jyotiraditya.dmt.data.source.local.KEY_START_FOLDER
+import dev.jyotiraditya.dmt.data.source.local.KEY_TRACK_AUDIO
 import dev.jyotiraditya.dmt.data.source.local.KEY_VISIBLE_LIBRARY_TABS
 import dev.jyotiraditya.dmt.data.source.local.dmtStore
 import dev.jyotiraditya.dmt.data.source.local.encodeCounts
@@ -52,10 +53,14 @@ import dev.jyotiraditya.dmt.domain.model.LibraryScan
 import dev.jyotiraditya.dmt.domain.model.LibrarySort
 import dev.jyotiraditya.dmt.domain.model.LibraryTab
 import dev.jyotiraditya.dmt.domain.model.LyricsSource
+import dev.jyotiraditya.dmt.domain.model.TrackAudioSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.uuid.Uuid
@@ -86,6 +91,34 @@ constructor(
     suspend fun saveSpeed(speed: Float) {
         context.dmtStore.edit { it[KEY_SPEED] = speed }
     }
+
+    /** The speed and pitch saved for [trackId], or null when the file uses the global speed. */
+    suspend fun trackAudioSettings(trackId: String): TrackAudioSettings? =
+        trackAudioSettings()[trackId]
+
+    suspend fun saveTrackAudioSettings(trackId: String, settings: TrackAudioSettings) {
+        context.dmtStore.edit { prefs ->
+            val current = decodeTrackAudio(prefs[KEY_TRACK_AUDIO]).toMutableMap()
+            current[trackId] = settings
+            prefs[KEY_TRACK_AUDIO] = Json.encodeToString(current)
+        }
+    }
+
+    suspend fun clearTrackAudioSettings(trackId: String) {
+        context.dmtStore.edit { prefs ->
+            val current = decodeTrackAudio(prefs[KEY_TRACK_AUDIO]).toMutableMap()
+            current.remove(trackId)
+            prefs[KEY_TRACK_AUDIO] = Json.encodeToString(current)
+        }
+    }
+
+    private suspend fun trackAudioSettings(): Map<String, TrackAudioSettings> =
+        decodeTrackAudio(context.dmtStore.data.first()[KEY_TRACK_AUDIO])
+
+    private fun decodeTrackAudio(raw: String?): Map<String, TrackAudioSettings> =
+        runCatching {
+            Json.decodeFromString<Map<String, TrackAudioSettings>>(raw ?: "{}")
+        }.getOrDefault(emptyMap())
 
     /** This install's Jellyfin device id, created on first use; Jellyfin keeps a session per id. */
     suspend fun jellyfinDeviceId(): String {

@@ -27,12 +27,13 @@ internal class NowPlayingDetailsLoader(
     private var coverJob: Job? = null
     private var animatedArtJob: Job? = null
     private var techJob: Job? = null
+    private var techFor: String? = null
+    private var techPlayed: Format? = null
 
-    /** Loads every detail of [mediaItem]; [played] is the format the player decoded, if known. */
-    fun load(mediaItem: MediaItem?, played: Format?) {
+    /** Loads the cover and animated art of [mediaItem]; the format comes with its tracks. */
+    fun load(mediaItem: MediaItem?) {
         loadCover(mediaItem)
         loadAnimatedArt(mediaItem)
-        loadTech(mediaItem, played)
     }
 
     /** Shows the cached cover of [mediaItem] at once, then the loaded one. */
@@ -66,9 +67,16 @@ internal class NowPlayingDetailsLoader(
     fun loadTech(mediaItem: MediaItem?, played: Format?) {
         val uri = mediaItem?.localConfiguration?.uri
         val forId = mediaItem?.mediaId
+        val track = trackFor(forId)
+        // The transition and the tracks callback both ask for this; read the file only once.
+        if (track != null && forId == techFor && (played == null || played == techPlayed)) return
+        if (track != null) {
+            techFor = forId
+            techPlayed = played
+        }
         techJob?.cancel()
         techJob = scope.launch {
-            val tech = uri?.let { getTrackTech(it, trackFor(forId), played) } ?: TrackTech.None
+            val tech = uri?.let { getTrackTech(it, track, played) } ?: TrackTech.None
             store.reduce {
                 if (it.nowPlayingId != forId) return@reduce it
                 it.copy(tech = tech.specs, quality = tech.quality)

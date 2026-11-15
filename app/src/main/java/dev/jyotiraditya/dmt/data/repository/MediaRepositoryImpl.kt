@@ -71,6 +71,8 @@ constructor(
             }
     }
 
+    override suspend fun changed(): Boolean = musicLibrary.changed()
+
     private suspend fun hiddenFolders(): Set<String> =
         settingsRepository.settings.first().hiddenFolders
 }

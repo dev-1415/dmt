@@ -25,6 +25,7 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import kotlin.math.abs
 
 private const val SEEK_HOLD_STEP_MS = 5_000L
 
@@ -114,12 +115,18 @@ private class PowerSavingRenderersFactory(context: Context) : DefaultRenderersFa
  * path. AAC and the other formats keep compressed offload, which is the efficient path.
  */
 @OptIn(UnstableApi::class)
-internal fun Player.applyOffloadPolicy(mediaItem: MediaItem?) {
+internal fun Player.applyOffloadPolicy(
+    mediaItem: MediaItem?,
+    speed: Float = 1f,
+    pitch: Float = 1f,
+) {
     val path = mediaItem?.localConfiguration?.tag as? String ?: return
     val extension = path.substringAfterLast('.', "").lowercase()
     // Offload is the efficient path; the deeper buffer and the normal performance mode keep
     // the DSP fed. Opus and Vorbis are not exposed to apps for offload on this device.
-    val offload = extension != "opus" && extension != "ogg"
+    // Pitch and speed shifts need the PCM processor, so they turn offload off.
+    val processed = abs(speed - 1f) > 0.001f || abs(pitch - 1f) > 0.001f
+    val offload = extension != "opus" && extension != "ogg" && !processed
     val gapless = extension != "opus" && extension != "ogg"
     val mode =
         if (offload) {

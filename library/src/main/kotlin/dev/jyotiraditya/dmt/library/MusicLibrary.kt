@@ -39,6 +39,12 @@ class MusicLibrary(private val context: Context, private val storedGeneration: G
         database.tracks().all().map { it.toTrack() }.visible(hidden)
     }
 
+    /** Whether the device's media store changed since the stored library was read. */
+    suspend fun changed(): Boolean = withContext(Dispatchers.IO) {
+        MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL_PRIMARY) !=
+            storedGeneration.get()
+    }
+
     /** Brings the stored library in line with the device and returns it; [refresh] reads it all. */
     suspend fun sync(hidden: Set<String>, refresh: Boolean = false): List<LibraryTrack> =
         withContext(Dispatchers.IO) {

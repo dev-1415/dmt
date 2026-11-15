@@ -179,12 +179,6 @@ private fun SettingsHome(state: DmtState, cover: Color, dispatch: (DmtAction) ->
             )
         }
         item {
-            RepairIndexRow(
-                scanning = state.scanning,
-                onRepair = { dispatch(DmtAction.RepairIndex) },
-            )
-        }
-        item {
             LinkRow(
                 label = stringResource(R.string.permissions_title),
                 value = null,

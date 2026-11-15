@@ -33,7 +33,6 @@ import dev.jyotiraditya.dmt.domain.model.Artist
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.domain.model.asCredit
 import dev.jyotiraditya.dmt.presentation.main.LocalContentBottom
-import dev.jyotiraditya.dmt.presentation.nowplaying.rememberWantsPlayback
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.ui.components.Artwork
@@ -189,7 +188,6 @@ internal fun TracksDetail(
     coverKey: Any? = null,
 ) {
     val openTrackMenu = rememberTrackMenu(state, dispatch, libraryNavigation(dispatch))
-    val playing = rememberWantsPlayback()
     LazyColumn(contentPadding = PaddingValues(bottom = LocalContentBottom.current)) {
         item { DetailHead(title, meta, tracks, coverKey = coverKey) }
         stickyHeader { DetailActions(title, tracks, dispatch) }

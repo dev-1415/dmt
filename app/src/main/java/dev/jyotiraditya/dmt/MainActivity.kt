@@ -21,7 +21,6 @@ import dev.jyotiraditya.dmt.presentation.main.SetupScreen
 import dev.jyotiraditya.dmt.presentation.player.PlayerViewModel
 import dev.jyotiraditya.dmt.presentation.player.nowPlayingSeed
 import dev.jyotiraditya.dmt.ui.components.rememberCoverColors
-import dev.jyotiraditya.dmt.ui.components.rememberFieldColor
 import dev.jyotiraditya.dmt.ui.theme.DMTTheme
 import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 import dev.jyotiraditya.dmt.ui.theme.accentFor
@@ -50,7 +49,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by playerViewModel.state.collectAsStateWithLifecycle()
             val player by playerViewModel.player.collectAsStateWithLifecycle()
-            val cover = rememberFieldColor(state.cover.bitmap, state.nowPlayingSeed)
+            // One quantization per cover: the Material You surface is the page tint too.
             val coverColors = rememberCoverColors(state.cover.bitmap, state.nowPlayingSeed)
             DMTTheme(accent = accentFor(state.settings.accent)) {
                 CompositionLocalProvider(LocalCoverColors provides coverColors) {
@@ -71,7 +70,7 @@ class MainActivity : ComponentActivity() {
                                 DmtScreen(
                                     state = state,
                                     player = player,
-                                    field = cover,
+                                    field = coverColors.surface,
                                     dispatch = playerViewModel::onIntent,
                                     artwork = playerViewModel.artwork,
                                 )

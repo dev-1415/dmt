@@ -14,7 +14,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.jyotiraditya.dmt.ui.icons.DmtIcons
 import dev.jyotiraditya.dmt.ui.theme.Ink
-import dev.jyotiraditya.dmt.ui.theme.Surface2
+import dev.jyotiraditya.dmt.ui.theme.LocalCoverColors
 
 /** A value between minus and plus blocks that step once per tap and repeat while held. */
 @Composable
@@ -54,13 +54,15 @@ fun Stepper(
 
 @Composable
 private fun StepBlock(icon: Int, label: String, enabled: Boolean, onStep: () -> Unit) {
+    val scheme = LocalCoverColors.current
     IconTap(
         icon = icon,
         description = label,
         onClick = onStep,
         onHold = onStep,
         enabled = enabled,
+        ink = scheme.primary,
         size = 56.dp,
-        modifier = Modifier.background(Surface2),
+        modifier = Modifier.background(scheme.primary.copy(alpha = 0.14f)),
     )
 }

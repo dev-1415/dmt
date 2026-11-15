@@ -10,6 +10,9 @@ interface MediaRepository {
 
     suspend fun scan(): List<Track>
 
+    /** Whether the source changed since the stored library was read, when cheap to check. */
+    suspend fun changed(): Boolean = false
+
     fun invalidate() = Unit
 
     /** Emits whenever the tracks have changed and are worth reading again. */

@@ -27,7 +27,6 @@ import dev.jyotiraditya.dmt.presentation.library.TrackMenuNavigation
 import dev.jyotiraditya.dmt.presentation.library.artistSummary
 import dev.jyotiraditya.dmt.presentation.library.rememberTrackMenu
 import dev.jyotiraditya.dmt.presentation.main.LocalContentBottom
-import dev.jyotiraditya.dmt.presentation.nowplaying.rememberWantsPlayback
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.settings.noTracksMessage
@@ -78,8 +77,6 @@ fun ListenPane(
             dispatch = dispatch,
             navigation = TrackMenuNavigation(openAlbum = onOpenAlbum, openArtist = onOpenArtist),
         )
-    val playing = rememberWantsPlayback()
-
     LazyColumn(contentPadding = PaddingValues(bottom = LocalContentBottom.current)) {
         item(key = "greeting") { Greeting(state, dispatch, onOpenLibrary) }
 

@@ -39,7 +39,6 @@ import dev.jyotiraditya.dmt.domain.model.Folder
 import dev.jyotiraditya.dmt.domain.model.LibrarySort
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.presentation.main.LocalContentBottom
-import dev.jyotiraditya.dmt.presentation.nowplaying.rememberWantsPlayback
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.player.DmtView
@@ -94,7 +93,6 @@ internal fun Shelf(view: DmtView, state: DmtState, dispatch: (DmtAction) -> Unit
     val bottom = PaddingValues(bottom = LocalContentBottom.current)
     val navigation = libraryNavigation(dispatch)
     val openTrackMenu = rememberTrackMenu(state, dispatch, navigation)
-    val playing = rememberWantsPlayback()
     var actions by remember { mutableStateOf<Pair<String, List<Track>>?>(null) }
     actions?.let { (title, tracks) ->
         ActionSheet(
@@ -109,7 +107,7 @@ internal fun Shelf(view: DmtView, state: DmtState, dispatch: (DmtAction) -> Unit
     if (state.query.isNotBlank()) {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(state = listState, contentPadding = bottom) {
-                results(state, view, playing, dispatch, navigation, openTrackMenu)
+                results(state, view, dispatch, navigation, openTrackMenu)
             }
             if (view == DmtView.FOLDERS) {
                 ScrollBar(
@@ -188,7 +186,6 @@ internal fun Shelf(view: DmtView, state: DmtState, dispatch: (DmtAction) -> Unit
                         rootTracks = rootTracks,
                         dispatch = dispatch,
                         openTrackMenu = openTrackMenu,
-                        playing = playing,
                         onLongPress = { title, tracks ->
                             actions =
                                 title to
@@ -201,7 +198,7 @@ internal fun Shelf(view: DmtView, state: DmtState, dispatch: (DmtAction) -> Unit
 
                 DmtView.PLAYLISTS -> playlists(state, dispatch)
 
-                else -> tracks(state, playing, dispatch, openTrackMenu)
+                else -> tracks(state, dispatch, openTrackMenu)
             }
         }
         if (view == DmtView.FOLDERS) {
@@ -220,7 +217,6 @@ private fun LazyListScope.folderShelf(
     rootTracks: List<Track>,
     dispatch: (DmtAction) -> Unit,
     openTrackMenu: (Track) -> Unit,
-    playing: Boolean,
     onLongPress: (String, List<Track>) -> Unit,
 ) {
     val roots = state.library.folderRoots
@@ -241,7 +237,6 @@ private fun LazyListScope.folderShelf(
                 state = state,
                 dispatch = dispatch,
                 openTrackMenu = openTrackMenu,
-                playing = playing,
                 onLongPress = onLongPress,
             )
 
@@ -262,7 +257,6 @@ private fun LazyListScope.folderShelf(
 
 private fun LazyListScope.tracks(
     state: DmtState,
-    playing: Boolean,
     dispatch: (DmtAction) -> Unit,
     openTrackMenu: (Track) -> Unit,
 ) {
@@ -328,7 +322,6 @@ private fun LazyListScope.tracks(
 private fun LazyListScope.results(
     state: DmtState,
     view: DmtView,
-    playing: Boolean,
     dispatch: (DmtAction) -> Unit,
     navigation: TrackMenuNavigation,
     openTrackMenu: (Track) -> Unit,

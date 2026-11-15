@@ -41,7 +41,7 @@ import kotlin.coroutines.resume
 
 private const val TAG = "LyricsEmbedder"
 
-/** Marks a TTML sidecar this app wrote, so an edited LRC can remove only our own file. */
+/** Marks a TTML sidecar an older version of this app wrote, so only ours is removed. */
 private const val TTML_MARKER = "<!-- DMT-TTML -->"
 
 /** The TTML timing attributes whose values need normalizing for other players. */
@@ -58,7 +58,6 @@ object LyricsEmbedder {
         context: Context,
         track: Track,
         lyrics: String,
-        ttml: String? = null,
     ): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -108,12 +107,8 @@ object LyricsEmbedder {
                     destination.delete()
                     runCatching { if (modified > 0L) file.setLastModified(modified) }
                     source.delete()
-                    // TTML-aware players read a sidecar; the standard LRC tag covers the rest.
-                    if (ttml != null) {
-                        runCatching { writeTtmlSidecar(file, ttml) }
-                    } else {
-                        runCatching { deleteTtmlSidecar(file) }
-                    }
+                    // Lyrics now live in the file; remove a sidecar left by an older version.
+                    runCatching { deleteTtmlSidecar(file) }
                     // The scan may lose tags for some formats, so the refresh puts them back.
                     runCatching { scanAndRefresh(context, file, track, tag, modified) }
                     if (BuildConfig.DEBUG) {
@@ -161,28 +156,10 @@ object LyricsEmbedder {
             }
         }
 
-    /** Writes the raw TTML beside the track, marked so an edited LRC can remove only our file. */
+    /** Writes standard TTML beside the track, normalized for TTML-aware players. */
     private fun writeTtmlSidecar(file: File, ttml: String) {
-        // A sidecar we wrote is already normalized and relative; only raw lrc.red TTML needs it.
-        val prepared =
-            if (ttml.contains(TTML_MARKER)) {
-                ttml.substringAfter(TTML_MARKER).trimStart()
-            } else {
-                relativizeTtmlTimes(normalizeTtmlTimes(ttml))
-            }
-        val marked =
-            if (prepared.startsWith("<?xml")) {
-                val end = prepared.indexOf("?>")
-                if (end >= 0) {
-                    prepared.substring(0, end + 2) + "\n" + TTML_MARKER + "\n" +
-                        prepared.substring(end + 2)
-                } else {
-                    "$TTML_MARKER\n$prepared"
-                }
-            } else {
-                "$TTML_MARKER\n$prepared"
-            }
-        File(file.parentFile, "${file.nameWithoutExtension}.ttml").writeText(marked)
+        val prepared = relativizeTtmlTimes(normalizeTtmlTimes(ttml))
+        File(file.parentFile, "${file.nameWithoutExtension}.ttml").writeText(prepared)
     }
 
     /** These TTML times moved by [offsetMs], for applying a lyric offset to the sidecar. */
@@ -302,7 +279,7 @@ object LyricsEmbedder {
         return String.format(Locale.ROOT, "%02d:%02d:%02d.%03d", hours, minutes, seconds, millis)
     }
 
-    /** Removes the TTML sidecar only when this app wrote it. */
+    /** Removes the track's TTML sidecar only when an older version of this app wrote it. */
     private fun deleteTtmlSidecar(file: File) {
         val sidecar = File(file.parentFile, "${file.nameWithoutExtension}.ttml")
         if (!sidecar.isFile) return
@@ -348,6 +325,8 @@ object LyricsEmbedder {
         tag.setField(tag.createField(FieldKey.LYRICS, lyrics))
         // Keep the comment header small enough for MediaStore and Media3 to read it.
         if (tag.hasField("UNSYNCEDLYRICS")) tag.deleteField("UNSYNCEDLYRICS")
+        // Remove the old app-specific TTML tag; lyrics now live in the standard lyrics tag.
+        runCatching { tag.deleteField(FieldKey.CUSTOM1) }
         when {
             format == "mp3" -> MP3FileWriter().writeFile(audio)
             inPlace -> AudioFileIO.write(audio)

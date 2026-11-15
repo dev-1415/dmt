@@ -42,7 +42,6 @@ import dev.jyotiraditya.dmt.domain.model.Folder
 import dev.jyotiraditya.dmt.domain.model.FolderSort
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.presentation.main.LocalContentBottom
-import dev.jyotiraditya.dmt.presentation.nowplaying.rememberWantsPlayback
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.presentation.settings.noTracksMessage
@@ -86,7 +85,6 @@ internal fun FolderDetail(
             settings.folderSort.sorted(folder.allTracks, settings.folderSortAscending)
         }
     val openTrackMenu = rememberTrackMenu(state, dispatch, libraryNavigation(dispatch))
-    val playing = rememberWantsPlayback()
     val listState = rememberLazyListState()
     val stickyOffset = with(LocalDensity.current) { 120.dp.roundToPx() }
     var actions by remember { mutableStateOf<Pair<String, List<Track>>?>(null) }
@@ -149,7 +147,6 @@ internal fun FolderDetail(
                 state = state,
                 dispatch = dispatch,
                 openTrackMenu = openTrackMenu,
-                playing = playing,
                 onLongPress = { title, tracks ->
                     actions =
                         title to settings.folderSort.sorted(tracks, settings.folderSortAscending)
@@ -220,7 +217,6 @@ internal fun LazyListScope.folderContents(
     state: DmtState,
     dispatch: (DmtAction) -> Unit,
     openTrackMenu: (Track) -> Unit,
-    playing: Boolean,
     onLongPress: (String, List<Track>) -> Unit,
 ) {
     val parentPath = folder.path.substringBeforeLast('/', missingDelimiterValue = "")

@@ -28,6 +28,7 @@ val KEY_LIBRARY_TAB_ORDER = stringPreferencesKey("library_tab_order")
 
 val KEY_SPEED = floatPreferencesKey("speed")
 val KEY_KEEP_PITCH = booleanPreferencesKey("keep_pitch")
+val KEY_TRACK_AUDIO = stringPreferencesKey("track_audio")
 val KEY_SLEEP_CUSTOM_MINUTES = intPreferencesKey("sleep_custom_minutes")
 val KEY_SLEEP_FINISH_SONG = booleanPreferencesKey("sleep_finish_song")
 val KEY_STAT_TOTAL = longPreferencesKey("stat_total_ms")

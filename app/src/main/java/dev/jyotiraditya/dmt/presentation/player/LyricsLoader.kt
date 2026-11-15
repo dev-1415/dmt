@@ -19,10 +19,15 @@ internal class LyricsLoader(
     private val store: StateStore<DmtState>,
 ) {
     private var job: Job? = null
+    private var loadedFor: String? = null
 
-    /** Reads the lyrics of [mediaItem] from the saved source. */
-    fun load(mediaItem: MediaItem?) {
+    /** Reads the lyrics of [mediaItem] from the saved source; [force] re-reads the same track. */
+    fun load(mediaItem: MediaItem?, force: Boolean = false) {
         val forId = mediaItem?.mediaId
+        val known = store.current.library.track(forId) != null
+        // A track transition clears the lyrics; never skip a reload that would leave them empty.
+        if (!force && known && forId == loadedFor && store.current.lyrics != null) return
+        if (known) loadedFor = forId
         store.reduce { it.copy(lyricsFetching = true) }
         job?.cancel()
         job = scope.launch {
@@ -58,7 +63,7 @@ internal class LyricsLoader(
             it.copy(lyricsSource = source, settings = it.settings.copy(lyricsSource = source))
         }
         scope.launch { preferences.update { it.copy(lyricsSource = source) } }
-        load(mediaItem)
+        load(mediaItem, force = true)
     }
 
     /** The saved source, read from storage until the settings have loaded. */

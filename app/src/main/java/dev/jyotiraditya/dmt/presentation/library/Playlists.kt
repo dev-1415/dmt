@@ -49,7 +49,6 @@ import dev.jyotiraditya.dmt.R
 import dev.jyotiraditya.dmt.domain.model.Playlist
 import dev.jyotiraditya.dmt.domain.model.Track
 import dev.jyotiraditya.dmt.presentation.main.LocalContentBottom
-import dev.jyotiraditya.dmt.presentation.nowplaying.rememberWantsPlayback
 import dev.jyotiraditya.dmt.presentation.player.DmtAction
 import dev.jyotiraditya.dmt.presentation.player.DmtState
 import dev.jyotiraditya.dmt.ui.components.Artwork
@@ -232,7 +231,6 @@ internal fun PlaylistDetail(playlist: Playlist, state: DmtState, dispatch: (DmtA
     if (picking) {
         PickerSheet(playlist, state, dispatch) { picking = false }
     }
-    val playing = rememberWantsPlayback()
     val albums =
         remember(playlist.tracks) {
             playlist.tracks.distinctBy { it.album.ifBlank { it.coverUri?.toString().orEmpty() } }

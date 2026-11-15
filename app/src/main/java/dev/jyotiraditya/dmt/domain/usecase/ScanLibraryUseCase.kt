@@ -22,15 +22,21 @@ class ScanLibraryUseCase @Inject constructor(private val mediaSourceProvider: Me
 
     fun changes(): Flow<Unit> = flow { emitAll(mediaSourceProvider.current().changes()) }
 
+    /** Whether the current source changed since the stored library was read. */
+    suspend fun changed(): Boolean = mediaSourceProvider.current().changed()
+
     /**
      * The library as stored, then as scanned now, each only when it changed; [refresh] skips the
-     * stored one.
+     * stored one, and [includeStored] can skip it for a quiet foreground check.
      */
-    operator fun invoke(refresh: Boolean = false): Flow<LibrarySnapshot> = flow {
+    operator fun invoke(
+        refresh: Boolean = false,
+        includeStored: Boolean = true,
+    ): Flow<LibrarySnapshot> = flow {
         val source = mediaSourceProvider.current()
         if (refresh) {
             source.invalidate()
-        } else {
+        } else if (includeStored) {
             source.stored().takeIf { it.isNotEmpty() }?.let { emit(it) }
         }
         emit(source.scan())

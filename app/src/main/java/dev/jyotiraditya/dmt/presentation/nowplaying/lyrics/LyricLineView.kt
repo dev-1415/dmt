@@ -119,7 +119,7 @@ private fun RunText(
     val unsungTarget = if (passed) colors.passed(colors.unsung) else colors.unsung
     val sung by animateColorAsState(sungTarget, tween(LYRIC_COLOR_MS), label = "sung")
     val unsung by animateColorAsState(unsungTarget, tween(LYRIC_COLOR_MS), label = "unsung")
-    if (run.words.isNotEmpty()) {
+    if (active && run.words.isNotEmpty()) {
         SweepText(
             text = run.text,
             words = run.words,

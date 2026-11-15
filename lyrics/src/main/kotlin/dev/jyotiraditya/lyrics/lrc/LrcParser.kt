@@ -132,7 +132,8 @@ private class LrcLineReader(private val hasUnprefixedVoice: Boolean) {
         val words = timed.words.map { it.copy(background = true) }
         lines +=
             LyricLine(
-                startMs = words.first().startMs,
+                // The inner [time] is the main line's start; keep it for the round trip.
+                startMs = stamp?.ms ?: words.first().startMs,
                 endMs = words.last().endMs,
                 text = timed.text,
                 words = words,

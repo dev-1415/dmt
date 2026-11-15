@@ -43,9 +43,8 @@ import dev.jyotiraditya.dmt.util.removeFromQueue
 import dev.jyotiraditya.dmt.util.resolveQueue
 import dev.jyotiraditya.dmt.util.suspendRunCatching
 import dev.jyotiraditya.dmt.util.toQueueRequest
-import dev.jyotiraditya.lyrics.LyricsParser
+import dev.jyotiraditya.lyrics.Lyrics
 import dev.jyotiraditya.lyrics.toLrc
-import dev.jyotiraditya.lyrics.toStandardLrc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -119,6 +118,9 @@ constructor(
 
     /** Whether the app has been in the background since it was last visible. */
     private var wasBackgrounded = false
+
+    /** The media id whose cover and lyrics are already on screen. */
+    private var detailsFor: String? = null
     private val queries = MutableStateFlow("")
 
     init {
@@ -177,17 +179,8 @@ constructor(
         }
     }
 
-    /** Re-indexes every audio file in the library, then reads the library again. */
-    private fun repairIndex() {
-        viewModelScope.launch {
-            reduce { it.copy(scanning = true) }
-            val roots = currentState.library.folderRoots.map { it.path }
-            val repaired = MediaIndexRepair.repair(context, roots)
-            reduce { it.copy(scanning = false) }
-            notify(UiText(R.string.notice_index_repaired, repaired))
-            scan(refresh = true)
-        }
-    }
+    /** The one Rescan action: re-indexes missing files, then reads the library again. */
+    private fun rescan() = scan(refresh = true, repair = true)
 
     /** Saves the tracks currently queued as a new playlist. */
     private fun saveQueue() {
@@ -215,9 +208,7 @@ constructor(
                 if (intent.granted) scan()
             }
 
-            DmtAction.Rescan -> scan(refresh = true)
-
-            DmtAction.RepairIndex -> repairIndex()
+            DmtAction.Rescan -> rescan()
 
             is DmtAction.Query -> {
                 reduce { it.copy(query = intent.value) }
@@ -355,7 +346,9 @@ constructor(
 
             DmtAction.EmbedLyrics -> embedLyrics()
 
-            is DmtAction.SaveLyrics -> saveLyrics(intent.text, intent.raw, intent.ttml)
+            is DmtAction.SaveLyrics -> saveLyrics(intent.text, intent.raw)
+
+            is DmtAction.SaveTimedLyrics -> saveTimedLyrics(intent.lyrics)
 
             DmtAction.CloseLyricsSources -> reduce { it.copy(lyricsSourcesOpen = false) }
 
@@ -366,6 +359,12 @@ constructor(
             DmtAction.SleepAtSongEnd -> c?.let(sleepAndSpeed::sleepAtSongEnd)
 
             is DmtAction.SetSpeed -> c?.let { sleepAndSpeed.setSpeed(it, intent.speed) }
+
+            is DmtAction.SetPitch -> c?.let { sleepAndSpeed.setPitch(it, intent.semitones) }
+
+            DmtAction.SaveTrackAudio -> saveTrackAudio()
+
+            DmtAction.ClearTrackAudio -> clearTrackAudio()
 
             is DmtAction.Config -> {
                 val old = currentState.settings
@@ -380,7 +379,7 @@ constructor(
                     details.loadAnimatedArt(c?.currentMediaItem)
                 }
                 if (old.lyricsSource != intent.settings.lyricsSource) {
-                    lyrics.load(c?.currentMediaItem)
+                    lyrics.load(c?.currentMediaItem, force = true)
                 }
                 c?.let { sleepAndSpeed.onSettings(it, old, intent.settings) }
             }
@@ -446,6 +445,7 @@ constructor(
         player.value = c
         sleepAndSpeed.restore(c)
         loadNowPlaying(c.currentMediaItem)
+        details.loadTech(c.currentMediaItem, c.currentTracks.playedAudioFormat())
         restoreSession()
     }
 
@@ -454,26 +454,48 @@ constructor(
         sendCustomCommand(PlaybackCommands.START_FOREGROUND, Bundle.EMPTY)
     }
 
-    private fun scan(refresh: Boolean = false) {
+    /**
+     * Reads the library; [quiet] skips the stored copy and the scanning state, for a foreground
+     * check that should not redraw the library when nothing changed.
+     */
+    private fun scan(
+        refresh: Boolean = false,
+        quiet: Boolean = false,
+        repair: Boolean = false,
+    ) {
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
-            reduce { it.copy(scanning = true) }
+            if (!quiet) reduce { it.copy(scanning = true) }
+            if (repair) {
+                val roots = currentState.library.folderRoots.map { it.path }
+                val repaired = MediaIndexRepair.repair(context, roots)
+                if (repaired > 0) notify(UiText(R.string.notice_index_repaired, repaired))
+            }
             val before = currentState.library
+            var emitted = false
             suspendRunCatching {
-                scanLibrary(refresh).collect { library ->
-                    showLibrary(library)
+                scanLibrary(refresh, includeStored = !quiet).collect { library ->
+                    if (showLibrary(library)) emitted = true
                     restoreSession()
                 }
             }
                 .onSuccess {
-                    val after = currentState.library
-                    recordScan(LibraryScan.between(before.tracks, after.tracks, compare = refresh))
+                    if (!quiet || emitted) {
+                        val after = currentState.library
+                        // A no-op read must not keep resetting the "last scan" time.
+                        if (refresh || before.tracks != after.tracks) {
+                            recordScan(
+                                LibraryScan.between(before.tracks, after.tracks, compare = refresh)
+                            )
+                        }
+                    }
                 }
                 .onFailure { failure ->
-                    showScanFailure(failure, keepLibrary = currentState.library !== before)
+                    // A quiet foreground check must never empty a library already on screen.
+                    showScanFailure(failure, keepLibrary = quiet || currentState.library !== before)
                 }
-            reduce { it.copy(scanning = false) }
-            mutatePlaylists()
+            if (!quiet) reduce { it.copy(scanning = false) }
+            if (!quiet || emitted) mutatePlaylists()
         }
     }
 
@@ -482,14 +504,20 @@ constructor(
         preferencesRepository.saveLastScan(scan)
     }
 
-    /** Puts [library] on screen, filtered by the current search and sort. */
-    private suspend fun showLibrary(library: LibrarySnapshot) {
+    /** Puts [library] on screen, filtered by the current search and sort; false if unchanged. */
+    private suspend fun showLibrary(library: LibrarySnapshot): Boolean {
+        // A quiet foreground check can hand back the very same snapshot.
+        if (currentState.library === library) return false
         filterJob?.cancel()
         val filtered = filterLibrary(library, currentState.query)
         val playing = controller?.currentMediaItem
         val wasKnown = currentState.nowPlayingTrack != null
         reduce { it.withLibrary(library).withFiltered(filtered).withHome() }
-        if (!wasKnown && currentState.nowPlayingTrack != null) loadNowPlaying(playing)
+        if (!wasKnown && currentState.nowPlayingTrack != null) {
+            loadNowPlaying(playing)
+            details.loadTech(playing, controller?.currentTracks?.playedAudioFormat())
+        }
+        return true
     }
 
     private suspend fun filterLibrary(library: LibrarySnapshot, query: String): FilteredLibrary {
@@ -563,14 +591,46 @@ constructor(
         loadNowPlaying(controller?.currentMediaItem)
         if (wasBackgrounded) {
             wasBackgrounded = false
-            if (currentState.hasPermission) scan(refresh = true)
+            // A cheap generation check; the ContentObserver already watches local changes.
+            if (currentState.hasPermission) {
+                viewModelScope.launch {
+                    if (scanLibrary.changed()) scan(refresh = true, quiet = true)
+                }
+            }
         }
     }
 
     private fun loadNowPlaying(mediaItem: MediaItem?) {
         if (!foreground) return
-        details.load(mediaItem, controller?.currentTracks?.playedAudioFormat())
+        val id = mediaItem?.mediaId
+        val known = currentState.nowPlayingTrack != null
+        // Returning to the same track must not re-read its cover, format and lyrics.
+        if (known && id == detailsFor) return
+        if (known) detailsFor = id
+        details.load(mediaItem)
         lyrics.load(mediaItem)
+        controller?.let { c ->
+            viewModelScope.launch { sleepAndSpeed.applyForTrack(c, id) }
+        }
+    }
+
+    private fun saveTrackAudio() {
+        val c = controller ?: return
+        val id = currentState.nowPlayingId ?: return
+        viewModelScope.launch {
+            sleepAndSpeed.saveForTrack(c, id)
+            notify(UiText(R.string.notice_track_audio_saved))
+        }
+    }
+
+    private fun clearTrackAudio() {
+        val c = controller ?: return
+        val id = currentState.nowPlayingId ?: return
+        viewModelScope.launch {
+            sleepAndSpeed.clearForTrack(id)
+            sleepAndSpeed.applyForTrack(c, id)
+            notify(UiText(R.string.notice_track_audio_cleared))
+        }
     }
 
     /** Writes the lyrics on screen into the playing track's file, replacing any embedded ones. */
@@ -587,9 +647,7 @@ constructor(
         c.stop()
         viewModelScope.launch {
             delay(500)
-            val standard = currentLyrics.toStandardLrc()
-            val ttml = currentLyrics.raw?.takeIf { it.trimStart().startsWith("<") }
-            LyricsEmbedder.embed(context, track, standard, ttml).fold(
+            LyricsEmbedder.embed(context, track, currentLyrics.toLrc()).fold(
                 onSuccess = {
                     // The file may keep its old size and modified date, so drop the cached lyrics.
                     getLyrics.invalidateLocal(track.path)
@@ -597,7 +655,7 @@ constructor(
                     // Re-read the file's tags so the library shows the same title and artist.
                     scan(refresh = true)
                     // Show the newly embedded lyrics at once, not the old ones.
-                    lyrics.load(c.currentMediaItem)
+                    lyrics.load(c.currentMediaItem, force = true)
                 },
                 onFailure = {
                     reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
@@ -612,7 +670,7 @@ constructor(
     }
 
     /** Writes edited lyrics into the playing track's file, keeping line timing when it can. */
-    private fun saveLyrics(text: String, raw: Boolean, ttml: String? = null) {
+    private fun saveLyrics(text: String, raw: Boolean) {
         val track = currentState.nowPlayingTrack ?: return
         if (track.source != TrackSource.LOCAL || track.path.isBlank()) return
         val c = controller ?: return
@@ -624,7 +682,6 @@ constructor(
         val edited = text.lines().map { it.trimEnd() }
         // Keep the original line and word timing when the edit has the same number of lines.
         // A line whose words changed loses its word timing, but the others keep theirs.
-        val isTtml = raw && text.trimStart().startsWith("<")
         val lrc =
             if (!raw && original != null && edited.size == original.lines.size) {
                 val lines =
@@ -644,18 +701,45 @@ constructor(
             } else {
                 text
             }
-        val parsed = LyricsParser.parse(lrc, relativeTtml = lrc.contains("<!-- DMT-TTML -->"))
-        val standard = parsed?.toStandardLrc() ?: lrc
-        val sidecar = ttml ?: if (isTtml) lrc else null
         c.stop()
         viewModelScope.launch {
             delay(500)
-            LyricsEmbedder.embed(context, track, standard, sidecar).fold(
+            LyricsEmbedder.embed(context, track, lrc).fold(
                 onSuccess = {
                     getLyrics.invalidateLocal(track.path)
                     notify(UiText(R.string.notice_lyrics_embedded))
                     scan(refresh = true)
-                    lyrics.load(c.currentMediaItem)
+                    lyrics.load(c.currentMediaItem, force = true)
+                },
+                onFailure = {
+                    reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
+                    scan(refresh = true)
+                },
+            )
+            c.setMediaItems(items, index, position)
+            c.prepare()
+            if (wasPlaying) c.play()
+        }
+    }
+
+    /** Writes lyrics whose line or word times were edited, as standard LRC and TTML. */
+    private fun saveTimedLyrics(timed: Lyrics) {
+        val track = currentState.nowPlayingTrack ?: return
+        if (track.source != TrackSource.LOCAL || track.path.isBlank()) return
+        val c = controller ?: return
+        val items = (0 until c.mediaItemCount).map { c.getMediaItemAt(it) }
+        val index = c.currentMediaItemIndex
+        val position = c.currentPosition
+        val wasPlaying = c.isPlaying
+        c.stop()
+        viewModelScope.launch {
+            delay(500)
+            LyricsEmbedder.embed(context, track, timed.toLrc()).fold(
+                onSuccess = {
+                    getLyrics.invalidateLocal(track.path)
+                    notify(UiText(R.string.notice_lyrics_embedded))
+                    scan(refresh = true)
+                    lyrics.load(c.currentMediaItem, force = true)
                 },
                 onFailure = {
                     reduce { it.copy(error = UiText(R.string.error_lyrics_embed)) }
